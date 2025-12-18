@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+RUNDIR="${XDG_RUNTIME_DIR:-/tmp}"
+PIDFILE="${RUNDIR}/joypadmouse.pid"
+LOGFILE="${RUNDIR}/joypadmouse.log"
+
+DEVICE="${JOYPADMOUSE_DEVICE:-${SUNSHINE_JOYMOUSE_DEVICE:-auto}}"
+HOLD_MS="${JOYPADMOUSE_HOLD_MS:-${SUNSHINE_JOYMOUSE_HOLD_MS:-4000}}"
+SPEED="${JOYPADMOUSE_SPEED:-${SUNSHINE_JOYMOUSE_SPEED:-300}}"
+WHEEL_RATE="${JOYPADMOUSE_WHEEL_RATE:-${SUNSHINE_JOYMOUSE_WHEEL_RATE:-4.5}}"
+DEADZONE="${JOYPADMOUSE_DEADZONE:-${SUNSHINE_JOYMOUSE_DEADZONE:-8000}}"
+POLL_HZ="${JOYPADMOUSE_POLL_HZ:-${SUNSHINE_JOYMOUSE_POLL_HZ:-125}}"
+
+if [[ -f "${PIDFILE}" ]]; then
+  pid="$(cat "${PIDFILE}" 2>/dev/null || true)"
+  if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
+    exit 0
+  fi
+fi
+
+nohup joypadmouse \
+  --device "${DEVICE}" \
+  --hold-ms "${HOLD_MS}" \
+  --speed "${SPEED}" \
+  --wheel-rate "${WHEEL_RATE}" \
+  --deadzone "${DEADZONE}" \
+  --poll-hz "${POLL_HZ}" \
+  >>"${LOGFILE}" 2>&1 &
+
+echo "$!" > "${PIDFILE}"
+

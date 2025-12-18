@@ -1,0 +1,105 @@
+# joypadmouse
+
+Tiny Linux daemon that turns a **gamepad into a mouse** (via `/dev/uinput`), with a **long-press toggle** (hold **Start** for 4 seconds by default).
+
+This project was created to work around a practical issue when streaming with **Sunshine** (host) + **Moonlight** (client): some Moonlight clients implement a “mouse mode” toggle (e.g. Moonlight Android), but **Moonlight New** shipped via **PortMaster** on handhelds like the **Anbernic RG35XX H** may not expose that feature. `joypadmouse` moves the toggle to the **host side**, so you can still navigate a desktop UI comfortably.
+
+## How it works
+
+- Reads controller input from the Linux joystick API (`/dev/input/js*`)
+- Creates a virtual mouse using Linux uinput (`/dev/uinput`)
+- In “mouse mode”, it emits `REL_X/REL_Y` (cursor), `REL_WHEEL` (scroll), and mouse buttons
+- Shows a small desktop toast on toggle using `notify-send` (best-effort; ignored if unavailable)
+
+## Default mapping
+
+Xbox-style layout (works well with Sunshine’s default virtual Xbox controller):
+
+- **Toggle mouse mode**: hold **Start** for 4 seconds
+- **Move cursor**: Left Stick
+- **Scroll**: Right Stick Y
+- **Left click**: A
+- **Right click**: B
+- **Middle click**: X
+- **Slow cursor**: hold LB
+- **Fast cursor**: hold RB
+
+## Build
+
+```bash
+make
+```
+
+## Install (local user)
+
+```bash
+make install
+```
+
+This installs:
+
+- `joypadmouse` → `~/.local/bin/joypadmouse`
+- Sunshine helper scripts → `~/.local/bin/sunshine-joypadmouse-start` and `~/.local/bin/sunshine-joypadmouse-stop`
+
+## Runtime permissions
+
+You need access to:
+
+- `/dev/uinput` (to create the virtual mouse)
+- `/dev/input/js*` (to read the gamepad)
+
+How you grant access depends on your distro setup (udev rules, ACLs, groups). On many distros, adding your user to the `input` group is enough:
+
+```bash
+sudo usermod -aG input "$USER"
+```
+
+Then log out/in.
+
+## Sunshine integration
+
+The recommended approach is to create a dedicated Sunshine “app” for the clients that need mouse mode (e.g. `RG35XXH`), and attach the start/stop scripts using *Command Preparations (Do/Undo)*.
+
+Example `apps.json` entry (simplified):
+
+```json
+{
+  "name": "RG35XXH",
+  "prep-cmd": [
+    { "do": "sunshine-joypadmouse-start", "undo": "sunshine-joypadmouse-stop" }
+  ],
+  "auto-detach": "true"
+}
+```
+
+Why a dedicated Sunshine app?
+
+- Sunshine does **not** expose the paired client name (e.g. “RG35XX H”) to prep commands as an environment variable.
+- Having a separate app entry makes it explicit and avoids impacting other Moonlight clients.
+
+## Tuning
+
+You can adjust parameters either by calling `joypadmouse` directly or via environment variables used by the Sunshine helper script:
+
+- `JOYPADMOUSE_SPEED` (default `300`) — cursor speed (lower is slower)
+- `JOYPADMOUSE_WHEEL_RATE` (default `4.5`) — scroll speed (lower is slower)
+- `JOYPADMOUSE_HOLD_MS` (default `4000`) — long-press toggle time
+- `JOYPADMOUSE_DEADZONE` (default `8000`) — stick deadzone
+- `JOYPADMOUSE_POLL_HZ` (default `125`) — polling rate
+- `JOYPADMOUSE_DEVICE` (default `auto`) — force a joystick device (e.g. `/dev/input/js2`)
+
+Example:
+
+```bash
+JOYPADMOUSE_SPEED=200 JOYPADMOUSE_WHEEL_RATE=3 sunshine-joypadmouse-start
+```
+
+## Known limitations
+
+- The button/axis mapping is “Xbox-style” and may differ on some controllers/clients.
+- Uses `/dev/input/js*` (legacy joystick interface). It’s simple and widely available, but not as expressive as `evdev`.
+
+## License
+
+MIT — see `LICENSE`.
+

@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+RUNDIR="${XDG_RUNTIME_DIR:-/tmp}"
+PIDFILE="${RUNDIR}/joypadmouse.pid"
+
+if [[ ! -f "${PIDFILE}" ]]; then
+  exit 0
+fi
+
+pid="$(cat "${PIDFILE}" 2>/dev/null || true)"
+rm -f "${PIDFILE}"
+
+if [[ -z "${pid}" ]]; then
+  exit 0
+fi
+
+if ! kill -0 "${pid}" 2>/dev/null; then
+  exit 0
+fi
+
+kill "${pid}" 2>/dev/null || true
+
+for _ in {1..50}; do
+  if ! kill -0 "${pid}" 2>/dev/null; then
+    exit 0
+  fi
+  sleep 0.1
+done
+
+kill -9 "${pid}" 2>/dev/null || true
+
