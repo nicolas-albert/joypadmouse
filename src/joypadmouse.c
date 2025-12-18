@@ -73,6 +73,7 @@ static void usage(const char *argv0) {
     "Usage: %s [--device auto|/dev/input/jsN] [--hold-ms 4000] [--speed 300] [--wheel-rate 4.5] [--deadzone 8000] [--poll-hz 125]\n"
     "\n"
     "Mouse mode toggle: hold START for hold-ms.\n"
+    "MangoHud toggle HUD: LB + RB + START (sends Shift_R+F12).\n"
     "Mapping (Xbox-style): LS=move, RS-Y=wheel, A=left click, B=right click, X=middle click, LB=slow, RB=fast.\n",
     argv0
   );
@@ -106,6 +107,40 @@ static int create_uinput_mouse(const char *name) {
   uidev.id.bustype = BUS_USB;
   uidev.id.vendor = 0x0001;
   uidev.id.product = 0x0001;
+  uidev.id.version = 1;
+
+  if (write(fd, &uidev, sizeof(uidev)) < 0) {
+    close(fd);
+    return -1;
+  }
+
+  if (ioctl(fd, UI_DEV_CREATE) < 0) {
+    close(fd);
+    return -1;
+  }
+
+  return fd;
+}
+
+static int create_uinput_keyboard(const char *name) {
+  int fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
+  if (fd < 0) {
+    return -1;
+  }
+
+  if (ioctl(fd, UI_SET_EVBIT, EV_KEY) < 0 ||
+      ioctl(fd, UI_SET_KEYBIT, KEY_RIGHTSHIFT) < 0 ||
+      ioctl(fd, UI_SET_KEYBIT, KEY_F12) < 0) {
+    close(fd);
+    return -1;
+  }
+
+  struct uinput_user_dev uidev;
+  memset(&uidev, 0, sizeof(uidev));
+  snprintf(uidev.name, sizeof(uidev.name), "%s", name);
+  uidev.id.bustype = BUS_USB;
+  uidev.id.vendor = 0x0001;
+  uidev.id.product = 0x0002;
   uidev.id.version = 1;
 
   if (write(fd, &uidev, sizeof(uidev)) < 0) {
@@ -260,6 +295,20 @@ static void notify_toggle(bool mouse_mode, int hold_ms) {
   _exit(0);
 }
 
+static void send_key_combo(int fd, uint16_t modifier_key, uint16_t key) {
+  if (fd < 0) {
+    return;
+  }
+
+  emit_event(fd, EV_KEY, modifier_key, 1);
+  emit_event(fd, EV_KEY, key, 1);
+  emit_syn(fd);
+
+  emit_event(fd, EV_KEY, key, 0);
+  emit_event(fd, EV_KEY, modifier_key, 0);
+  emit_syn(fd);
+}
+
 int main(int argc, char **argv) {
   const char *joy_path = "auto";
   int hold_ms = 4000;
@@ -320,6 +369,11 @@ int main(int argc, char **argv) {
   if (ufd < 0) {
     fprintf(stderr, "joypadmouse: can't open/create /dev/uinput (%s)\n", strerror(errno));
     return 1;
+  }
+
+  int kfd = create_uinput_keyboard("joypadmouse hotkeys");
+  if (kfd < 0) {
+    fprintf(stderr, "joypadmouse: warning: can't create uinput keyboard, MangoHud hotkeys disabled (%s)\n", strerror(errno));
   }
 
   char opened_path[64];
@@ -429,8 +483,23 @@ int main(int argc, char **argv) {
       break;
     }
 
+    bool modifiers = false;
+    if (btn_lb < (int) sizeof(buttons) && btn_rb < (int) sizeof(buttons)) {
+      modifiers = buttons[btn_lb] && buttons[btn_rb];
+    }
+
+    if (kfd >= 0 && modifiers && btn_start < (int) sizeof(buttons) &&
+        buttons[btn_start] && !prev_buttons[btn_start]) {
+      send_key_combo(kfd, KEY_RIGHTSHIFT, KEY_F12);
+      start_down_at = -1;
+      start_consumed = true;
+    }
+
     if (btn_start < (int) sizeof(buttons) && buttons[btn_start]) {
-      if (start_down_at < 0) {
+      if (modifiers) {
+        // Used for hotkeys, don't treat this as the mouse toggle.
+        start_down_at = -1;
+      } else if (start_down_at < 0) {
         start_down_at = now_ms();
         start_consumed = false;
       } else if (!start_consumed && (now_ms() - start_down_at) >= hold_ms) {
@@ -515,6 +584,6 @@ int main(int argc, char **argv) {
 
   close(jfd);
   destroy_uinput(ufd);
+  destroy_uinput(kfd);
   return 0;
 }
-

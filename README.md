@@ -16,6 +16,7 @@ This project was created to work around a practical issue when streaming with **
 Xbox-style layout (works well with Sunshine’s default virtual Xbox controller):
 
 - **Toggle mouse mode**: hold **Start** for 4 seconds
+- **MangoHud toggle HUD**: **LB + RB + Start** (sends `Shift_R+F12`)
 - **Move cursor**: Left Stick
 - **Scroll**: Right Stick Y
 - **Left click**: A
@@ -102,4 +103,3 @@ JOYPADMOUSE_SPEED=200 JOYPADMOUSE_WHEEL_RATE=3 sunshine-joypadmouse-start
 ## License
 
 MIT — see `LICENSE`.
-
