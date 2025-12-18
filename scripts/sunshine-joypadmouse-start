@@ -6,6 +6,7 @@ PIDFILE="${RUNDIR}/joypadmouse.pid"
 LOGFILE="${RUNDIR}/joypadmouse.log"
 
 DEVICE="${JOYPADMOUSE_DEVICE:-${SUNSHINE_JOYMOUSE_DEVICE:-auto}}"
+MOUSE_TOGGLE="${JOYPADMOUSE_MOUSE_TOGGLE:-start+lb}"
 HOLD_MS="${JOYPADMOUSE_HOLD_MS:-${SUNSHINE_JOYMOUSE_HOLD_MS:-4000}}"
 SPEED="${JOYPADMOUSE_SPEED:-${SUNSHINE_JOYMOUSE_SPEED:-300}}"
 WHEEL_RATE="${JOYPADMOUSE_WHEEL_RATE:-${SUNSHINE_JOYMOUSE_WHEEL_RATE:-4.5}}"
@@ -21,6 +22,7 @@ fi
 
 nohup joypadmouse \
   --device "${DEVICE}" \
+  --mouse-toggle "${MOUSE_TOGGLE}" \
   --hold-ms "${HOLD_MS}" \
   --speed "${SPEED}" \
   --wheel-rate "${WHEEL_RATE}" \
@@ -29,4 +31,3 @@ nohup joypadmouse \
   >>"${LOGFILE}" 2>&1 &
 
 echo "$!" > "${PIDFILE}"
-

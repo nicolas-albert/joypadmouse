@@ -1,8 +1,10 @@
 # joypadmouse
 
-Tiny Linux daemon that turns a **gamepad into a mouse** (via `/dev/uinput`), with a **long-press toggle** (hold **Start** for 4 seconds by default).
+Tiny Linux daemon that turns a **gamepad into a mouse** (via `/dev/uinput`), with a **long-press toggle** (hold **Start + LB** for 4 seconds by default).
 
 This project was created to work around a practical issue when streaming with **Sunshine** (host) + **Moonlight** (client): some Moonlight clients implement a “mouse mode” toggle (e.g. Moonlight Android), but **Moonlight New** shipped via **PortMaster** on handhelds like the **Anbernic RG35XX H** may not expose that feature. `joypadmouse` moves the toggle to the **host side**, so you can still navigate a desktop UI comfortably.
+
+To avoid conflicting with clients that already use **Start long-press** for mouse mode (like Moonlight Android), the recommended default toggle for `joypadmouse` is **Start + LB long-press**.
 
 ## How it works
 
@@ -15,7 +17,7 @@ This project was created to work around a practical issue when streaming with **
 
 Xbox-style layout (works well with Sunshine’s default virtual Xbox controller):
 
-- **Toggle mouse mode**: hold **Start** for 4 seconds
+- **Toggle mouse mode (default)**: hold **Start + LB** for 4 seconds
 - **MangoHud toggle HUD**: **LB + RB + Start** (sends `Shift_R+F12`)
 - **Move cursor**: Left Stick
 - **Scroll**: Right Stick Y
@@ -85,6 +87,7 @@ You can adjust parameters either by calling `joypadmouse` directly or via enviro
 - `JOYPADMOUSE_SPEED` (default `300`) — cursor speed (lower is slower)
 - `JOYPADMOUSE_WHEEL_RATE` (default `4.5`) — scroll speed (lower is slower)
 - `JOYPADMOUSE_HOLD_MS` (default `4000`) — long-press toggle time
+- `JOYPADMOUSE_MOUSE_TOGGLE` (default `start+lb`) — mouse toggle chord (`start+lb`, `start`, `start+rb`, `lb+rb`)
 - `JOYPADMOUSE_DEADZONE` (default `8000`) — stick deadzone
 - `JOYPADMOUSE_POLL_HZ` (default `125`) — polling rate
 - `JOYPADMOUSE_DEVICE` (default `auto`) — force a joystick device (e.g. `/dev/input/js2`)

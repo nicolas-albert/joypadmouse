@@ -70,9 +70,9 @@ static double norm_axis(int v, int deadzone) {
 static void usage(const char *argv0) {
   fprintf(
     stderr,
-    "Usage: %s [--device auto|/dev/input/jsN] [--hold-ms 4000] [--speed 300] [--wheel-rate 4.5] [--deadzone 8000] [--poll-hz 125]\n"
+    "Usage: %s [--device auto|/dev/input/jsN] [--mouse-toggle start+lb|start|start+rb|lb+rb] [--hold-ms 4000] [--speed 300] [--wheel-rate 4.5] [--deadzone 8000] [--poll-hz 125]\n"
     "\n"
-    "Mouse mode toggle: hold START for hold-ms.\n"
+    "Mouse mode toggle (default): hold START+LB for hold-ms.\n"
     "MangoHud toggle HUD: LB + RB + START (sends Shift_R+F12).\n"
     "Mapping (Xbox-style): LS=move, RS-Y=wheel, A=left click, B=right click, X=middle click, LB=slow, RB=fast.\n",
     argv0
@@ -278,7 +278,8 @@ static void notify_toggle(bool mouse_mode, int hold_ms) {
 
   char msg[128];
   if (mouse_mode) {
-    snprintf(msg, sizeof(msg), "Mouse mode: ON (hold Start %ds to toggle)", hold_ms / 1000);
+    (void) hold_ms;
+    snprintf(msg, sizeof(msg), "Mouse mode: ON");
   } else {
     snprintf(msg, sizeof(msg), "Mouse mode: OFF");
   }
@@ -311,6 +312,7 @@ static void send_key_combo(int fd, uint16_t modifier_key, uint16_t key) {
 
 int main(int argc, char **argv) {
   const char *joy_path = "auto";
+  const char *mouse_toggle = "start+lb";
   int hold_ms = 4000;
   int deadzone = 8000;
   int speed = 300;
@@ -320,6 +322,8 @@ int main(int argc, char **argv) {
   for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "--device") && i + 1 < argc) {
       joy_path = argv[++i];
+    } else if (!strcmp(argv[i], "--mouse-toggle") && i + 1 < argc) {
+      mouse_toggle = argv[++i];
     } else if (!strcmp(argv[i], "--hold-ms") && i + 1 < argc) {
       hold_ms = atoi(argv[++i]);
     } else if (!strcmp(argv[i], "--deadzone") && i + 1 < argc) {
@@ -337,6 +341,32 @@ int main(int argc, char **argv) {
       usage(argv[0]);
       return 2;
     }
+  }
+
+  bool toggle_requires_start = false;
+  bool toggle_requires_lb = false;
+  bool toggle_requires_rb = false;
+  bool toggle_requires_back = false;
+
+  if (!strcmp(mouse_toggle, "start+lb") || !strcmp(mouse_toggle, "lb+start")) {
+    toggle_requires_start = true;
+    toggle_requires_lb = true;
+  } else if (!strcmp(mouse_toggle, "start")) {
+    toggle_requires_start = true;
+  } else if (!strcmp(mouse_toggle, "start+rb") || !strcmp(mouse_toggle, "rb+start")) {
+    toggle_requires_start = true;
+    toggle_requires_rb = true;
+  } else if (!strcmp(mouse_toggle, "lb+rb") || !strcmp(mouse_toggle, "rb+lb")) {
+    toggle_requires_lb = true;
+    toggle_requires_rb = true;
+  } else if (!strcmp(mouse_toggle, "start+back") || !strcmp(mouse_toggle, "back+start") || !strcmp(mouse_toggle, "start+select") ||
+             !strcmp(mouse_toggle, "select+start")) {
+    toggle_requires_start = true;
+    toggle_requires_back = true;
+  } else {
+    fprintf(stderr, "joypadmouse: invalid --mouse-toggle value: %s\n", mouse_toggle);
+    usage(argv[0]);
+    return 2;
   }
 
   if (hold_ms < 0) {
@@ -417,6 +447,7 @@ int main(int argc, char **argv) {
   const int btn_x = 2;
   const int btn_lb = 4;
   const int btn_rb = 5;
+  const int btn_back = 6;
   const int btn_start = 7;
 
   bool mouse_mode = false;
@@ -495,7 +526,21 @@ int main(int argc, char **argv) {
       start_consumed = true;
     }
 
-    if (btn_start < (int) sizeof(buttons) && buttons[btn_start]) {
+    bool toggle_chord_active = true;
+    if (toggle_requires_start) {
+      toggle_chord_active = toggle_chord_active && btn_start < (int) sizeof(buttons) && buttons[btn_start];
+    }
+    if (toggle_requires_lb) {
+      toggle_chord_active = toggle_chord_active && btn_lb < (int) sizeof(buttons) && buttons[btn_lb];
+    }
+    if (toggle_requires_rb) {
+      toggle_chord_active = toggle_chord_active && btn_rb < (int) sizeof(buttons) && buttons[btn_rb];
+    }
+    if (toggle_requires_back) {
+      toggle_chord_active = toggle_chord_active && btn_back < (int) sizeof(buttons) && buttons[btn_back];
+    }
+
+    if (toggle_chord_active) {
       if (modifiers) {
         // Used for hotkeys, don't treat this as the mouse toggle.
         start_down_at = -1;
