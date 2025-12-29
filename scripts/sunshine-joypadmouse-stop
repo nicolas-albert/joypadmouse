@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-RUNDIR="${XDG_RUNTIME_DIR:-/tmp}"
+USER_UID="$(id -u)"
+DEFAULT_RUNDIR="/run/user/${USER_UID}"
+if [[ -n "${XDG_RUNTIME_DIR:-}" ]]; then
+  RUNDIR="${XDG_RUNTIME_DIR}"
+elif [[ -d "${DEFAULT_RUNDIR}" ]]; then
+  RUNDIR="${DEFAULT_RUNDIR}"
+else
+  RUNDIR="/tmp"
+fi
 PIDFILE="${RUNDIR}/joypadmouse.pid"
 
 if [[ ! -f "${PIDFILE}" ]]; then
@@ -29,4 +37,3 @@ for _ in {1..50}; do
 done
 
 kill -9 "${pid}" 2>/dev/null || true
-

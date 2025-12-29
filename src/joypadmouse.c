@@ -67,13 +67,80 @@ static double norm_axis(int v, int deadzone) {
   return sign * ((double) (av - deadzone) / (double) (32767 - deadzone));
 }
 
+static const char *button_label(uint8_t idx) {
+  switch (idx) {
+    case 0:
+      return "A";
+    case 1:
+      return "B";
+    case 2:
+      return "X";
+    case 3:
+      return "Y";
+    case 4:
+      return "LB";
+    case 5:
+      return "RB";
+    case 6:
+      return "Back";
+    case 7:
+      return "Start";
+    default:
+      return NULL;
+  }
+}
+
+static bool parse_chord(
+  const char *value,
+  bool *req_start,
+  bool *req_back,
+  bool *req_lb,
+  bool *req_rb
+) {
+  if (!value || !*value) {
+    return false;
+  }
+
+  char buf[64];
+  if (snprintf(buf, sizeof(buf), "%s", value) >= (int) sizeof(buf)) {
+    return false;
+  }
+
+  *req_start = false;
+  *req_back = false;
+  *req_lb = false;
+  *req_rb = false;
+
+  char *saveptr = NULL;
+  for (char *tok = strtok_r(buf, "+", &saveptr); tok; tok = strtok_r(NULL, "+", &saveptr)) {
+    if (!*tok) {
+      return false;
+    }
+    if (!strcmp(tok, "start")) {
+      *req_start = true;
+    } else if (!strcmp(tok, "back") || !strcmp(tok, "select")) {
+      *req_back = true;
+    } else if (!strcmp(tok, "lb")) {
+      *req_lb = true;
+    } else if (!strcmp(tok, "rb")) {
+      *req_rb = true;
+    } else {
+      return false;
+    }
+  }
+
+  return *req_start || *req_back || *req_lb || *req_rb;
+}
+
 static void usage(const char *argv0) {
   fprintf(
     stderr,
-    "Usage: %s [--device auto|/dev/input/jsN] [--mouse-toggle start+lb|start|start+rb|lb+rb] [--hold-ms 4000] [--speed 300] [--wheel-rate 4.5] [--deadzone 8000] [--poll-hz 125]\n"
+    "Usage: %s [--device auto|/dev/input/jsN] [--mouse-toggle start+lb|start|start+rb|lb+rb|start+back|back] "
+    "[--mangohud-toggle lb+rb+start|lb+rb+back|start|back|start+back|none] [--mangohud-repeat 1] [--mangohud-delay-ms 80] "
+    "[--hold-ms 4000] [--speed 300] [--wheel-rate 4.5] [--deadzone 8000] [--poll-hz 125] [--log-events]\n"
     "\n"
     "Mouse mode toggle (default): hold START+LB for hold-ms.\n"
-    "MangoHud toggle HUD: LB + RB + START (sends Shift_R+F12).\n"
+    "MangoHud toggle HUD (configurable): LB + RB + START (sends Shift_R+F12).\n"
     "Mapping (Xbox-style): LS=move, RS-Y=wheel, A=left click, B=right click, X=middle click, LB=slow, RB=fast.\n",
     argv0
   );
@@ -310,20 +377,47 @@ static void send_key_combo(int fd, uint16_t modifier_key, uint16_t key) {
   emit_syn(fd);
 }
 
+static void send_key_combo_repeat(int fd, uint16_t modifier_key, uint16_t key, int repeat, int delay_ms) {
+  if (fd < 0) {
+    return;
+  }
+
+  if (repeat < 1) {
+    repeat = 1;
+  }
+
+  for (int i = 0; i < repeat; i++) {
+    send_key_combo(fd, modifier_key, key);
+    if (delay_ms > 0 && i + 1 < repeat) {
+      sleep_ms(delay_ms);
+    }
+  }
+}
+
 int main(int argc, char **argv) {
   const char *joy_path = "auto";
   const char *mouse_toggle = "start+lb";
+  const char *mangohud_toggle = "lb+rb+start";
   int hold_ms = 4000;
   int deadzone = 8000;
   int speed = 300;
   double wheel_rate = 4.5;
   int poll_hz = 125;
+  int mangohud_repeat = 1;
+  int mangohud_delay_ms = 80;
+  bool log_events = false;
 
   for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "--device") && i + 1 < argc) {
       joy_path = argv[++i];
     } else if (!strcmp(argv[i], "--mouse-toggle") && i + 1 < argc) {
       mouse_toggle = argv[++i];
+    } else if (!strcmp(argv[i], "--mangohud-toggle") && i + 1 < argc) {
+      mangohud_toggle = argv[++i];
+    } else if (!strcmp(argv[i], "--mangohud-repeat") && i + 1 < argc) {
+      mangohud_repeat = atoi(argv[++i]);
+    } else if (!strcmp(argv[i], "--mangohud-delay-ms") && i + 1 < argc) {
+      mangohud_delay_ms = atoi(argv[++i]);
     } else if (!strcmp(argv[i], "--hold-ms") && i + 1 < argc) {
       hold_ms = atoi(argv[++i]);
     } else if (!strcmp(argv[i], "--deadzone") && i + 1 < argc) {
@@ -334,6 +428,8 @@ int main(int argc, char **argv) {
       wheel_rate = atof(argv[++i]);
     } else if (!strcmp(argv[i], "--poll-hz") && i + 1 < argc) {
       poll_hz = atoi(argv[++i]);
+    } else if (!strcmp(argv[i], "--log-events")) {
+      log_events = true;
     } else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
       usage(argv[0]);
       return 0;
@@ -348,25 +444,76 @@ int main(int argc, char **argv) {
   bool toggle_requires_rb = false;
   bool toggle_requires_back = false;
 
-  if (!strcmp(mouse_toggle, "start+lb") || !strcmp(mouse_toggle, "lb+start")) {
-    toggle_requires_start = true;
-    toggle_requires_lb = true;
-  } else if (!strcmp(mouse_toggle, "start")) {
-    toggle_requires_start = true;
-  } else if (!strcmp(mouse_toggle, "start+rb") || !strcmp(mouse_toggle, "rb+start")) {
-    toggle_requires_start = true;
-    toggle_requires_rb = true;
-  } else if (!strcmp(mouse_toggle, "lb+rb") || !strcmp(mouse_toggle, "rb+lb")) {
-    toggle_requires_lb = true;
-    toggle_requires_rb = true;
-  } else if (!strcmp(mouse_toggle, "start+back") || !strcmp(mouse_toggle, "back+start") || !strcmp(mouse_toggle, "start+select") ||
-             !strcmp(mouse_toggle, "select+start")) {
-    toggle_requires_start = true;
-    toggle_requires_back = true;
-  } else {
+  if (!parse_chord(mouse_toggle, &toggle_requires_start, &toggle_requires_back, &toggle_requires_lb, &toggle_requires_rb)) {
     fprintf(stderr, "joypadmouse: invalid --mouse-toggle value: %s\n", mouse_toggle);
     usage(argv[0]);
     return 2;
+  }
+
+  bool mouse_toggle_valid = false;
+  if (toggle_requires_start && toggle_requires_lb &&
+      !toggle_requires_rb && !toggle_requires_back) {
+    mouse_toggle_valid = true;
+  } else if (toggle_requires_start &&
+             !toggle_requires_lb && !toggle_requires_rb && !toggle_requires_back) {
+    mouse_toggle_valid = true;
+  } else if (toggle_requires_start && toggle_requires_rb &&
+             !toggle_requires_lb && !toggle_requires_back) {
+    mouse_toggle_valid = true;
+  } else if (toggle_requires_lb && toggle_requires_rb &&
+             !toggle_requires_start && !toggle_requires_back) {
+    mouse_toggle_valid = true;
+  } else if (toggle_requires_start && toggle_requires_back &&
+             !toggle_requires_lb && !toggle_requires_rb) {
+    mouse_toggle_valid = true;
+  } else if (toggle_requires_back &&
+             !toggle_requires_start && !toggle_requires_lb && !toggle_requires_rb) {
+    mouse_toggle_valid = true;
+  }
+
+  if (!mouse_toggle_valid) {
+    fprintf(stderr, "joypadmouse: invalid --mouse-toggle value: %s\n", mouse_toggle);
+    usage(argv[0]);
+    return 2;
+  }
+
+  bool mangohud_enabled = true;
+  bool mangohud_requires_start = false;
+  bool mangohud_requires_lb = false;
+  bool mangohud_requires_rb = false;
+  bool mangohud_requires_back = false;
+
+  if (!strcmp(mangohud_toggle, "none")) {
+    mangohud_enabled = false;
+  } else if (!parse_chord(mangohud_toggle, &mangohud_requires_start, &mangohud_requires_back,
+                          &mangohud_requires_lb, &mangohud_requires_rb)) {
+    fprintf(stderr, "joypadmouse: invalid --mangohud-toggle value: %s\n", mangohud_toggle);
+    usage(argv[0]);
+    return 2;
+  } else {
+    bool mangohud_valid = false;
+    if (mangohud_requires_lb && mangohud_requires_rb && mangohud_requires_start &&
+        !mangohud_requires_back) {
+      mangohud_valid = true;
+    } else if (mangohud_requires_lb && mangohud_requires_rb && mangohud_requires_back &&
+               !mangohud_requires_start) {
+      mangohud_valid = true;
+    } else if (mangohud_requires_start &&
+               !mangohud_requires_back && !mangohud_requires_lb && !mangohud_requires_rb) {
+      mangohud_valid = true;
+    } else if (mangohud_requires_back &&
+               !mangohud_requires_start && !mangohud_requires_lb && !mangohud_requires_rb) {
+      mangohud_valid = true;
+    } else if (mangohud_requires_start && mangohud_requires_back &&
+               !mangohud_requires_lb && !mangohud_requires_rb) {
+      mangohud_valid = true;
+    }
+
+    if (!mangohud_valid) {
+      fprintf(stderr, "joypadmouse: invalid --mangohud-toggle value: %s\n", mangohud_toggle);
+      usage(argv[0]);
+      return 2;
+    }
   }
 
   if (hold_ms < 0) {
@@ -390,6 +537,18 @@ int main(int argc, char **argv) {
   if (poll_hz > 1000) {
     poll_hz = 1000;
   }
+  if (mangohud_repeat < 1) {
+    mangohud_repeat = 1;
+  }
+  if (mangohud_repeat > 10) {
+    mangohud_repeat = 10;
+  }
+  if (mangohud_delay_ms < 0) {
+    mangohud_delay_ms = 0;
+  }
+  if (mangohud_delay_ms > 1000) {
+    mangohud_delay_ms = 1000;
+  }
 
   signal(SIGINT, handle_signal);
   signal(SIGTERM, handle_signal);
@@ -401,9 +560,12 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  int kfd = create_uinput_keyboard("joypadmouse hotkeys");
-  if (kfd < 0) {
-    fprintf(stderr, "joypadmouse: warning: can't create uinput keyboard, MangoHud hotkeys disabled (%s)\n", strerror(errno));
+  int kfd = -1;
+  if (mangohud_enabled) {
+    kfd = create_uinput_keyboard("joypadmouse hotkeys");
+    if (kfd < 0) {
+      fprintf(stderr, "joypadmouse: warning: can't create uinput keyboard, MangoHud hotkeys disabled (%s)\n", strerror(errno));
+    }
   }
 
   char opened_path[64];
@@ -451,8 +613,9 @@ int main(int argc, char **argv) {
   const int btn_start = 7;
 
   bool mouse_mode = false;
-  int64_t start_down_at = -1;
-  bool start_consumed = false;
+  int64_t toggle_down_at = -1;
+  bool toggle_consumed = false;
+  bool mangohud_prev_active = false;
 
   double dx_acc = 0.0;
   double dy_acc = 0.0;
@@ -476,6 +639,14 @@ int main(int argc, char **argv) {
         } else if (type == JS_EVENT_BUTTON) {
           if (e.number < (uint8_t) (sizeof(buttons) / sizeof(buttons[0]))) {
             buttons[e.number] = e.value ? 1 : 0;
+          }
+          if (log_events) {
+            const char *label = button_label(e.number);
+            if (label) {
+              fprintf(stderr, "joypadmouse: button=%s(%u) value=%d\n", label, e.number, e.value ? 1 : 0);
+            } else {
+              fprintf(stderr, "joypadmouse: button=%u value=%d\n", e.number, e.value ? 1 : 0);
+            }
           }
         }
         continue;
@@ -514,16 +685,30 @@ int main(int argc, char **argv) {
       break;
     }
 
-    bool modifiers = false;
-    if (btn_lb < (int) sizeof(buttons) && btn_rb < (int) sizeof(buttons)) {
-      modifiers = buttons[btn_lb] && buttons[btn_rb];
+    bool mangohud_chord_active = false;
+    if (mangohud_enabled) {
+      mangohud_chord_active = true;
+      if (mangohud_requires_start) {
+        mangohud_chord_active = mangohud_chord_active &&
+                                btn_start < (int) sizeof(buttons) && buttons[btn_start];
+      }
+      if (mangohud_requires_lb) {
+        mangohud_chord_active = mangohud_chord_active &&
+                                btn_lb < (int) sizeof(buttons) && buttons[btn_lb];
+      }
+      if (mangohud_requires_rb) {
+        mangohud_chord_active = mangohud_chord_active &&
+                                btn_rb < (int) sizeof(buttons) && buttons[btn_rb];
+      }
+      if (mangohud_requires_back) {
+        mangohud_chord_active = mangohud_chord_active &&
+                                btn_back < (int) sizeof(buttons) && buttons[btn_back];
+      }
     }
 
-    if (kfd >= 0 && modifiers && btn_start < (int) sizeof(buttons) &&
-        buttons[btn_start] && !prev_buttons[btn_start]) {
-      send_key_combo(kfd, KEY_RIGHTSHIFT, KEY_F12);
-      start_down_at = -1;
-      start_consumed = true;
+    if (mangohud_enabled && kfd >= 0 && mangohud_chord_active && !mangohud_prev_active) {
+      send_key_combo_repeat(kfd, KEY_RIGHTSHIFT, KEY_F12, mangohud_repeat, mangohud_delay_ms);
+      fprintf(stderr, "joypadmouse: mangohud toggle\n");
     }
 
     bool toggle_chord_active = true;
@@ -540,16 +725,16 @@ int main(int argc, char **argv) {
       toggle_chord_active = toggle_chord_active && btn_back < (int) sizeof(buttons) && buttons[btn_back];
     }
 
-    if (toggle_chord_active) {
-      if (modifiers) {
-        // Used for hotkeys, don't treat this as the mouse toggle.
-        start_down_at = -1;
-      } else if (start_down_at < 0) {
-        start_down_at = now_ms();
-        start_consumed = false;
-      } else if (!start_consumed && (now_ms() - start_down_at) >= hold_ms) {
+    if (mangohud_chord_active) {
+      toggle_down_at = -1;
+      toggle_consumed = false;
+    } else if (toggle_chord_active) {
+      if (toggle_down_at < 0) {
+        toggle_down_at = now_ms();
+        toggle_consumed = false;
+      } else if (!toggle_consumed && (now_ms() - toggle_down_at) >= hold_ms) {
         mouse_mode = !mouse_mode;
-        start_consumed = true;
+        toggle_consumed = true;
         fprintf(stderr, "joypadmouse: mouse_mode=%s\n", mouse_mode ? "on" : "off");
         notify_toggle(mouse_mode, hold_ms);
 
@@ -564,8 +749,8 @@ int main(int argc, char **argv) {
         dx_acc = dy_acc = wheel_acc = 0.0;
       }
     } else {
-      start_down_at = -1;
-      start_consumed = false;
+      toggle_down_at = -1;
+      toggle_consumed = false;
     }
 
     if (mouse_mode) {
@@ -620,6 +805,7 @@ int main(int argc, char **argv) {
       }
     }
 
+    mangohud_prev_active = mangohud_chord_active;
     memcpy(prev_buttons, buttons, sizeof(prev_buttons));
 
     if (sleep_us > 0) {

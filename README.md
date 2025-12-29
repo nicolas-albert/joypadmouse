@@ -18,7 +18,7 @@ To avoid conflicting with clients that already use **Start long-press** for mous
 Xbox-style layout (works well with Sunshine’s default virtual Xbox controller):
 
 - **Toggle mouse mode (default)**: hold **Start + LB** for 4 seconds
-- **MangoHud toggle HUD**: **LB + RB + Start** (sends `Shift_R+F12`)
+- **MangoHud toggle HUD (default)**: **LB + RB + Start** (sends `Shift_R+F12`)
 - **Move cursor**: Left Stick
 - **Scroll**: Right Stick Y
 - **Left click**: A
@@ -26,6 +26,8 @@ Xbox-style layout (works well with Sunshine’s default virtual Xbox controller)
 - **Middle click**: X
 - **Slow cursor**: hold LB
 - **Fast cursor**: hold RB
+
+If the MangoHud chord overlaps with the mouse toggle chord, MangoHud takes priority while the chord is held.
 
 ## Build
 
@@ -87,7 +89,11 @@ You can adjust parameters either by calling `joypadmouse` directly or via enviro
 - `JOYPADMOUSE_SPEED` (default `300`) — cursor speed (lower is slower)
 - `JOYPADMOUSE_WHEEL_RATE` (default `4.5`) — scroll speed (lower is slower)
 - `JOYPADMOUSE_HOLD_MS` (default `4000`) — long-press toggle time
-- `JOYPADMOUSE_MOUSE_TOGGLE` (default `start+lb`) — mouse toggle chord (`start+lb`, `start`, `start+rb`, `lb+rb`)
+- `JOYPADMOUSE_MOUSE_TOGGLE` (default `start+lb`) — mouse toggle chord (`start+lb`, `start`, `start+rb`, `lb+rb`, `start+back`, `back`)
+- `JOYPADMOUSE_MANGOHUD_TOGGLE` (default `lb+rb+start`) — MangoHud chord (`lb+rb+start`, `lb+rb+back`, `start`, `back`, `start+back`, `none`)
+- `JOYPADMOUSE_MANGOHUD_REPEAT` (default `1`) — how many times to send the MangoHud hotkey
+- `JOYPADMOUSE_MANGOHUD_DELAY_MS` (default `80`) — delay between repeated MangoHud hotkeys
+- `JOYPADMOUSE_LOG_EVENTS` (default `0`) — set to `1` to log button events to the logfile
 - `JOYPADMOUSE_DEADZONE` (default `8000`) — stick deadzone
 - `JOYPADMOUSE_POLL_HZ` (default `125`) — polling rate
 - `JOYPADMOUSE_DEVICE` (default `auto`) — force a joystick device (e.g. `/dev/input/js2`)
@@ -97,6 +103,14 @@ Example:
 ```bash
 JOYPADMOUSE_SPEED=200 JOYPADMOUSE_WHEEL_RATE=3 sunshine-joypadmouse-start
 ```
+
+If a Moonlight client swallows **Start** (for example on macOS), switch MangoHud to **LB+RB+Back**:
+
+```bash
+JOYPADMOUSE_MANGOHUD_TOGGLE=lb+rb+back sunshine-joypadmouse-start
+```
+
+Logs go to `XDG_RUNTIME_DIR/joypadmouse.log` (or `/run/user/UID/joypadmouse.log` if `XDG_RUNTIME_DIR` is not set).
 
 ## Known limitations
 
