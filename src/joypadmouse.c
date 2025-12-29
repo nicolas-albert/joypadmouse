@@ -137,6 +137,7 @@ static void usage(const char *argv0) {
     stderr,
     "Usage: %s [--device auto|/dev/input/jsN] [--mouse-toggle start+lb|start|start+rb|lb+rb|start+back|back] "
     "[--mangohud-toggle lb+rb+start|lb+rb+back|start|back|start+back|none] [--mangohud-repeat 1] [--mangohud-delay-ms 80] "
+    "[--mangohud-prekey shift|none] [--mangohud-prekey-delay-ms 80] "
     "[--hold-ms 4000] [--speed 300] [--wheel-rate 4.5] [--deadzone 8000] [--poll-hz 125] [--log-events]\n"
     "\n"
     "Mouse mode toggle (default): hold START+LB for hold-ms.\n"
@@ -377,6 +378,17 @@ static void send_key_combo(int fd, uint16_t modifier_key, uint16_t key) {
   emit_syn(fd);
 }
 
+static void send_key_tap(int fd, uint16_t key) {
+  if (fd < 0) {
+    return;
+  }
+
+  emit_event(fd, EV_KEY, key, 1);
+  emit_syn(fd);
+  emit_event(fd, EV_KEY, key, 0);
+  emit_syn(fd);
+}
+
 static void send_key_combo_repeat(int fd, uint16_t modifier_key, uint16_t key, int repeat, int delay_ms) {
   if (fd < 0) {
     return;
@@ -398,6 +410,7 @@ int main(int argc, char **argv) {
   const char *joy_path = "auto";
   const char *mouse_toggle = "start+lb";
   const char *mangohud_toggle = "lb+rb+start";
+  const char *mangohud_prekey = "none";
   int hold_ms = 4000;
   int deadzone = 8000;
   int speed = 300;
@@ -405,6 +418,7 @@ int main(int argc, char **argv) {
   int poll_hz = 125;
   int mangohud_repeat = 1;
   int mangohud_delay_ms = 80;
+  int mangohud_prekey_delay_ms = 80;
   bool log_events = false;
 
   for (int i = 1; i < argc; i++) {
@@ -418,6 +432,10 @@ int main(int argc, char **argv) {
       mangohud_repeat = atoi(argv[++i]);
     } else if (!strcmp(argv[i], "--mangohud-delay-ms") && i + 1 < argc) {
       mangohud_delay_ms = atoi(argv[++i]);
+    } else if (!strcmp(argv[i], "--mangohud-prekey") && i + 1 < argc) {
+      mangohud_prekey = argv[++i];
+    } else if (!strcmp(argv[i], "--mangohud-prekey-delay-ms") && i + 1 < argc) {
+      mangohud_prekey_delay_ms = atoi(argv[++i]);
     } else if (!strcmp(argv[i], "--hold-ms") && i + 1 < argc) {
       hold_ms = atoi(argv[++i]);
     } else if (!strcmp(argv[i], "--deadzone") && i + 1 < argc) {
@@ -482,6 +500,7 @@ int main(int argc, char **argv) {
   bool mangohud_requires_lb = false;
   bool mangohud_requires_rb = false;
   bool mangohud_requires_back = false;
+  bool mangohud_prekey_shift = false;
 
   if (!strcmp(mangohud_toggle, "none")) {
     mangohud_enabled = false;
@@ -511,6 +530,18 @@ int main(int argc, char **argv) {
 
     if (!mangohud_valid) {
       fprintf(stderr, "joypadmouse: invalid --mangohud-toggle value: %s\n", mangohud_toggle);
+      usage(argv[0]);
+      return 2;
+    }
+  }
+
+  if (mangohud_enabled) {
+    if (!strcmp(mangohud_prekey, "none")) {
+      mangohud_prekey_shift = false;
+    } else if (!strcmp(mangohud_prekey, "shift")) {
+      mangohud_prekey_shift = true;
+    } else {
+      fprintf(stderr, "joypadmouse: invalid --mangohud-prekey value: %s\n", mangohud_prekey);
       usage(argv[0]);
       return 2;
     }
@@ -548,6 +579,12 @@ int main(int argc, char **argv) {
   }
   if (mangohud_delay_ms > 1000) {
     mangohud_delay_ms = 1000;
+  }
+  if (mangohud_prekey_delay_ms < 0) {
+    mangohud_prekey_delay_ms = 0;
+  }
+  if (mangohud_prekey_delay_ms > 1000) {
+    mangohud_prekey_delay_ms = 1000;
   }
 
   signal(SIGINT, handle_signal);
@@ -707,6 +744,12 @@ int main(int argc, char **argv) {
     }
 
     if (mangohud_enabled && kfd >= 0 && mangohud_chord_active && !mangohud_prev_active) {
+      if (mangohud_prekey_shift) {
+        send_key_tap(kfd, KEY_RIGHTSHIFT);
+        if (mangohud_prekey_delay_ms > 0) {
+          sleep_ms(mangohud_prekey_delay_ms);
+        }
+      }
       send_key_combo_repeat(kfd, KEY_RIGHTSHIFT, KEY_F12, mangohud_repeat, mangohud_delay_ms);
       fprintf(stderr, "joypadmouse: mangohud toggle\n");
     }

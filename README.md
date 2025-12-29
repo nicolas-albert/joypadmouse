@@ -93,6 +93,8 @@ You can adjust parameters either by calling `joypadmouse` directly or via enviro
 - `JOYPADMOUSE_MANGOHUD_TOGGLE` (default `lb+rb+start`) — MangoHud chord (`lb+rb+start`, `lb+rb+back`, `start`, `back`, `start+back`, `none`)
 - `JOYPADMOUSE_MANGOHUD_REPEAT` (default `1`) — how many times to send the MangoHud hotkey
 - `JOYPADMOUSE_MANGOHUD_DELAY_MS` (default `80`) — delay between repeated MangoHud hotkeys
+- `JOYPADMOUSE_MANGOHUD_PREKEY` (default `none`) — optional pre-key before the MangoHud hotkey (`shift` or `none`)
+- `JOYPADMOUSE_MANGOHUD_PREKEY_DELAY_MS` (default `80`) — delay between the pre-key and MangoHud hotkey
 - `JOYPADMOUSE_LOG_EVENTS` (default `0`) — set to `1` to log button events to the logfile
 - `JOYPADMOUSE_DEADZONE` (default `8000`) — stick deadzone
 - `JOYPADMOUSE_POLL_HZ` (default `125`) — polling rate
@@ -108,6 +110,12 @@ If a Moonlight client swallows **Start** (for example on macOS), switch MangoHud
 
 ```bash
 JOYPADMOUSE_MANGOHUD_TOGGLE=lb+rb+back sunshine-joypadmouse-start
+```
+
+If a game needs a keyboard event before it will accept the MangoHud hotkey, add a pre-key:
+
+```bash
+JOYPADMOUSE_MANGOHUD_PREKEY=shift JOYPADMOUSE_MANGOHUD_PREKEY_DELAY_MS=150 sunshine-joypadmouse-start
 ```
 
 Logs go to `XDG_RUNTIME_DIR/joypadmouse.log` (or `/run/user/UID/joypadmouse.log` if `XDG_RUNTIME_DIR` is not set).
