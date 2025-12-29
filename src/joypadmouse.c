@@ -138,7 +138,7 @@ static void usage(const char *argv0) {
     "Usage: %s [--device auto|/dev/input/jsN] [--mouse-toggle start+lb|start|start+rb|lb+rb|start+back|back] "
     "[--mangohud-toggle lb+rb+start|lb+rb+back|start|back|start+back|none] [--mangohud-repeat 1] [--mangohud-delay-ms 80] "
     "[--mangohud-hold-ms 0] [--mangohud-prekey shift|f12|esc|tab|space|enter|none] [--mangohud-prekey-delay-ms 80] "
-    "[--hold-ms 4000] [--speed 300] [--wheel-rate 4.5] [--deadzone 8000] [--poll-hz 125] [--log-events]\n"
+    "[--hold-ms 500] [--speed 300] [--wheel-rate 4.5] [--deadzone 8000] [--poll-hz 125] [--log-events]\n"
     "\n"
     "Mouse mode toggle (default): hold START+LB for hold-ms.\n"
     "MangoHud toggle HUD (configurable): LB + RB + START (sends Shift_R+F12).\n"
@@ -422,7 +422,7 @@ int main(int argc, char **argv) {
   const char *mouse_toggle = "start+lb";
   const char *mangohud_toggle = "lb+rb+start";
   const char *mangohud_prekey = "none";
-  int hold_ms = 4000;
+  int hold_ms = 500;
   int deadzone = 8000;
   int speed = 300;
   double wheel_rate = 4.5;
