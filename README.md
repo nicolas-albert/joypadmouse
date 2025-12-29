@@ -93,7 +93,8 @@ You can adjust parameters either by calling `joypadmouse` directly or via enviro
 - `JOYPADMOUSE_MANGOHUD_TOGGLE` (default `lb+rb+start`) — MangoHud chord (`lb+rb+start`, `lb+rb+back`, `start`, `back`, `start+back`, `none`)
 - `JOYPADMOUSE_MANGOHUD_REPEAT` (default `1`) — how many times to send the MangoHud hotkey
 - `JOYPADMOUSE_MANGOHUD_DELAY_MS` (default `80`) — delay between repeated MangoHud hotkeys
-- `JOYPADMOUSE_MANGOHUD_PREKEY` (default `none`) — optional pre-key before the MangoHud hotkey (`shift` or `none`)
+- `JOYPADMOUSE_MANGOHUD_HOLD_MS` (default `0`) — hold time for the MangoHud hotkey before release
+- `JOYPADMOUSE_MANGOHUD_PREKEY` (default `none`) — optional pre-key before the MangoHud hotkey (`shift`, `f12`, `esc`, `tab`, `space`, `enter`, `none`)
 - `JOYPADMOUSE_MANGOHUD_PREKEY_DELAY_MS` (default `80`) — delay between the pre-key and MangoHud hotkey
 - `JOYPADMOUSE_LOG_EVENTS` (default `0`) — set to `1` to log button events to the logfile
 - `JOYPADMOUSE_DEADZONE` (default `8000`) — stick deadzone
