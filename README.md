@@ -89,7 +89,7 @@ You can adjust parameters either by calling `joypadmouse` directly or via enviro
 - `JOYPADMOUSE_SPEED` (default `300`) — cursor speed (lower is slower)
 - `JOYPADMOUSE_WHEEL_RATE` (default `4.5`) — scroll speed (lower is slower)
 - `JOYPADMOUSE_HOLD_MS` (default `500`) — long-press toggle time
-- `JOYPADMOUSE_MOUSE_TOGGLE` (default `back+lb`) — mouse toggle chord (`start+lb`, `start`, `start+rb`, `lb+rb`, `start+back`, `back`)
+- `JOYPADMOUSE_MOUSE_TOGGLE` (default `back+lb`) — mouse toggle chord (`start+lb`, `start`, `start+rb`, `lb+rb`, `start+back`, `back`, `back+lb`)
 - `JOYPADMOUSE_MANGOHUD_TOGGLE` (default `lb+rb+back`) — MangoHud chord (`lb+rb+start`, `lb+rb+back`, `start`, `back`, `start+back`, `none`)
 - `JOYPADMOUSE_MANGOHUD_REPEAT` (default `1`) — how many times to send the MangoHud hotkey
 - `JOYPADMOUSE_MANGOHUD_DELAY_MS` (default `80`) — delay between repeated MangoHud hotkeys

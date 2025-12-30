@@ -135,7 +135,7 @@ static bool parse_chord(
 static void usage(const char *argv0) {
   fprintf(
     stderr,
-    "Usage: %s [--device auto|/dev/input/jsN] [--mouse-toggle start+lb|start|start+rb|lb+rb|start+back|back] "
+    "Usage: %s [--device auto|/dev/input/jsN] [--mouse-toggle start+lb|start|start+rb|lb+rb|start+back|back|back+lb] "
     "[--mangohud-toggle lb+rb+start|lb+rb+back|start|back|start+back|none] [--mangohud-repeat 1] [--mangohud-delay-ms 80] "
     "[--mangohud-hold-ms 0] [--mangohud-prekey shift|f12|esc|tab|space|enter|none] [--mangohud-prekey-delay-ms 80] "
     "[--hold-ms 500] [--speed 300] [--wheel-rate 4.5] [--deadzone 8000] [--poll-hz 125] [--log-events]\n"
@@ -497,6 +497,9 @@ int main(int argc, char **argv) {
     mouse_toggle_valid = true;
   } else if (toggle_requires_start && toggle_requires_back &&
              !toggle_requires_lb && !toggle_requires_rb) {
+    mouse_toggle_valid = true;
+  } else if (toggle_requires_back && toggle_requires_lb &&
+             !toggle_requires_start && !toggle_requires_rb) {
     mouse_toggle_valid = true;
   } else if (toggle_requires_back &&
              !toggle_requires_start && !toggle_requires_lb && !toggle_requires_rb) {
