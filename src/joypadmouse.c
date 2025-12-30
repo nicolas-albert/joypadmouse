@@ -686,6 +686,7 @@ int main(int argc, char **argv) {
   int64_t toggle_down_at = -1;
   bool toggle_consumed = false;
   bool mangohud_prev_active = false;
+  bool mangohud_pending = false;
 
   double dx_acc = 0.0;
   double dy_acc = 0.0;
@@ -695,6 +696,7 @@ int main(int argc, char **argv) {
   const double fast_mult = 2.00;
 
   const int sleep_us = 1000000 / poll_hz;
+  const int mangohud_release_delay_ms = 80;
 
   while (!g_stop) {
     struct js_event e;
@@ -776,22 +778,30 @@ int main(int argc, char **argv) {
       }
     }
 
-    if (mangohud_enabled && kfd >= 0 && mangohud_chord_active && !mangohud_prev_active) {
-      if (mangohud_prekey_code != 0) {
-        send_key_tap(kfd, mangohud_prekey_code);
-        if (mangohud_prekey_delay_ms > 0) {
-          sleep_ms(mangohud_prekey_delay_ms);
+    if (mangohud_enabled && kfd >= 0) {
+      if (mangohud_chord_active && !mangohud_prev_active) {
+        mangohud_pending = true;
+      } else if (!mangohud_chord_active && mangohud_prev_active && mangohud_pending) {
+        mangohud_pending = false;
+        if (mangohud_release_delay_ms > 0) {
+          sleep_ms(mangohud_release_delay_ms);
         }
+        if (mangohud_prekey_code != 0) {
+          send_key_tap(kfd, mangohud_prekey_code);
+          if (mangohud_prekey_delay_ms > 0) {
+            sleep_ms(mangohud_prekey_delay_ms);
+          }
+        }
+        send_key_combo_repeat(
+          kfd,
+          KEY_RIGHTSHIFT,
+          KEY_F12,
+          mangohud_repeat,
+          mangohud_delay_ms,
+          mangohud_hold_ms
+        );
+        fprintf(stderr, "joypadmouse: mangohud toggle\n");
       }
-      send_key_combo_repeat(
-        kfd,
-        KEY_RIGHTSHIFT,
-        KEY_F12,
-        mangohud_repeat,
-        mangohud_delay_ms,
-        mangohud_hold_ms
-      );
-      fprintf(stderr, "joypadmouse: mangohud toggle\n");
     }
 
     bool toggle_chord_active = true;
