@@ -421,7 +421,7 @@ int main(int argc, char **argv) {
   const char *joy_path = "auto";
   const char *mouse_toggle = "back+lb";
   const char *mangohud_toggle = "lb+rb+back";
-  const char *mangohud_prekey = "tab";
+  const char *mangohud_prekey = "shift";
   int hold_ms = 500;
   int deadzone = 8000;
   int speed = 300;
