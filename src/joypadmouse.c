@@ -848,7 +848,6 @@ int main(int argc, char **argv) {
       double ly = axis_ly < (int) (sizeof(axes) / sizeof(axes[0])) ? norm_axis(axes[axis_ly], deadzone) : 0.0;
       double ry = axis_ry < (int) (sizeof(axes) / sizeof(axes[0])) ? norm_axis(axes[axis_ry], deadzone) : 0.0;
 
-      ly = -ly;
 
       dx_acc += lx * (double) speed * mult / (double) poll_hz;
       dy_acc += ly * (double) speed * mult / (double) poll_hz;
