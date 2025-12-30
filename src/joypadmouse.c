@@ -421,7 +421,7 @@ int main(int argc, char **argv) {
   const char *joy_path = "auto";
   const char *mouse_toggle = "back+lb";
   const char *mangohud_toggle = "lb+rb+back";
-  const char *mangohud_prekey = "none";
+  const char *mangohud_prekey = "tab";
   int hold_ms = 500;
   int deadzone = 8000;
   int speed = 300;
@@ -430,7 +430,7 @@ int main(int argc, char **argv) {
   int mangohud_repeat = 1;
   int mangohud_delay_ms = 80;
   int mangohud_hold_ms = 0;
-  int mangohud_prekey_delay_ms = 80;
+  int mangohud_prekey_delay_ms = 200;
   bool log_events = false;
 
   for (int i = 1; i < argc; i++) {
