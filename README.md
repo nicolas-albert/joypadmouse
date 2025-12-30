@@ -1,10 +1,10 @@
 # joypadmouse
 
-Tiny Linux daemon that turns a **gamepad into a mouse** (via `/dev/uinput`), with a **long-press toggle** (hold **Start + LB** for 500 ms by default).
+Tiny Linux daemon that turns a **gamepad into a mouse** (via `/dev/uinput`), with a **long-press toggle** (hold **Back/Select + LB** for 500 ms by default).
 
 This project was created to work around a practical issue when streaming with **Sunshine** (host) + **Moonlight** (client): some Moonlight clients implement a “mouse mode” toggle (e.g. Moonlight Android), but **Moonlight New** shipped via **PortMaster** on handhelds like the **Anbernic RG35XX H** may not expose that feature. `joypadmouse` moves the toggle to the **host side**, so you can still navigate a desktop UI comfortably.
 
-To avoid conflicting with clients that already use **Start long-press** for mouse mode (like Moonlight Android), the recommended default toggle for `joypadmouse` is **Start + LB long-press**.
+To avoid conflicting with clients that already use **Start long-press** for mouse mode (like Moonlight Android), the recommended default toggle for `joypadmouse` is **Back/Select + LB long-press**.
 
 ## How it works
 
@@ -17,8 +17,8 @@ To avoid conflicting with clients that already use **Start long-press** for mous
 
 Xbox-style layout (works well with Sunshine’s default virtual Xbox controller):
 
-- **Toggle mouse mode (default)**: hold **Start + LB** for 500 ms
-- **MangoHud toggle HUD (default)**: **LB + RB + Start** (sends `Shift_R+F12`)
+- **Toggle mouse mode (default)**: hold **Back/Select + LB** for 500 ms
+- **MangoHud toggle HUD (default)**: **LB + RB + Back/Select** (sends `Shift_R+F12`)
 - **Move cursor**: Left Stick
 - **Scroll**: Right Stick Y
 - **Left click**: A
@@ -89,8 +89,8 @@ You can adjust parameters either by calling `joypadmouse` directly or via enviro
 - `JOYPADMOUSE_SPEED` (default `300`) — cursor speed (lower is slower)
 - `JOYPADMOUSE_WHEEL_RATE` (default `4.5`) — scroll speed (lower is slower)
 - `JOYPADMOUSE_HOLD_MS` (default `500`) — long-press toggle time
-- `JOYPADMOUSE_MOUSE_TOGGLE` (default `start+lb`) — mouse toggle chord (`start+lb`, `start`, `start+rb`, `lb+rb`, `start+back`, `back`)
-- `JOYPADMOUSE_MANGOHUD_TOGGLE` (default `lb+rb+start`) — MangoHud chord (`lb+rb+start`, `lb+rb+back`, `start`, `back`, `start+back`, `none`)
+- `JOYPADMOUSE_MOUSE_TOGGLE` (default `back+lb`) — mouse toggle chord (`start+lb`, `start`, `start+rb`, `lb+rb`, `start+back`, `back`)
+- `JOYPADMOUSE_MANGOHUD_TOGGLE` (default `lb+rb+back`) — MangoHud chord (`lb+rb+start`, `lb+rb+back`, `start`, `back`, `start+back`, `none`)
 - `JOYPADMOUSE_MANGOHUD_REPEAT` (default `1`) — how many times to send the MangoHud hotkey
 - `JOYPADMOUSE_MANGOHUD_DELAY_MS` (default `80`) — delay between repeated MangoHud hotkeys
 - `JOYPADMOUSE_MANGOHUD_HOLD_MS` (default `0`) — hold time for the MangoHud hotkey before release
@@ -107,10 +107,10 @@ Example:
 JOYPADMOUSE_SPEED=200 JOYPADMOUSE_WHEEL_RATE=3 sunshine-joypadmouse-start
 ```
 
-If a Moonlight client swallows **Start** (for example on macOS), switch MangoHud to **LB+RB+Back**:
+If you need a Start-based MangoHud toggle, switch to **LB+RB+Start**:
 
 ```bash
-JOYPADMOUSE_MANGOHUD_TOGGLE=lb+rb+back sunshine-joypadmouse-start
+JOYPADMOUSE_MANGOHUD_TOGGLE=lb+rb+start sunshine-joypadmouse-start
 ```
 
 If a game needs a keyboard event before it will accept the MangoHud hotkey, add a pre-key:
