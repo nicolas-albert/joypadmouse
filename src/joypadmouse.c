@@ -696,7 +696,7 @@ int main(int argc, char **argv) {
   const double fast_mult = 2.00;
 
   const int sleep_us = 1000000 / poll_hz;
-  const int mangohud_release_delay_ms = 80;
+  const int mangohud_release_delay_ms = 200;
 
   while (!g_stop) {
     struct js_event e;
