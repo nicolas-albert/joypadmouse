@@ -393,6 +393,22 @@ static void send_key_tap(int fd, uint16_t key) {
   emit_syn(fd);
 }
 
+static void send_key_down(int fd, uint16_t key) {
+  if (fd < 0) {
+    return;
+  }
+  emit_event(fd, EV_KEY, key, 1);
+  emit_syn(fd);
+}
+
+static void send_key_up(int fd, uint16_t key) {
+  if (fd < 0) {
+    return;
+  }
+  emit_event(fd, EV_KEY, key, 0);
+  emit_syn(fd);
+}
+
 static void send_key_combo_repeat(
   int fd,
   uint16_t modifier_key,
@@ -786,20 +802,38 @@ int main(int argc, char **argv) {
         if (mangohud_release_delay_ms > 0) {
           sleep_ms(mangohud_release_delay_ms);
         }
-        if (mangohud_prekey_code != 0) {
-          send_key_tap(kfd, mangohud_prekey_code);
+        if (mangohud_prekey_code == KEY_RIGHTSHIFT) {
+          send_key_down(kfd, KEY_RIGHTSHIFT);
           if (mangohud_prekey_delay_ms > 0) {
             sleep_ms(mangohud_prekey_delay_ms);
           }
+          for (int i = 0; i < mangohud_repeat; i++) {
+            send_key_down(kfd, KEY_F12);
+            if (mangohud_hold_ms > 0) {
+              sleep_ms(mangohud_hold_ms);
+            }
+            send_key_up(kfd, KEY_F12);
+            if (mangohud_delay_ms > 0 && i + 1 < mangohud_repeat) {
+              sleep_ms(mangohud_delay_ms);
+            }
+          }
+          send_key_up(kfd, KEY_RIGHTSHIFT);
+        } else {
+          if (mangohud_prekey_code != 0) {
+            send_key_tap(kfd, mangohud_prekey_code);
+            if (mangohud_prekey_delay_ms > 0) {
+              sleep_ms(mangohud_prekey_delay_ms);
+            }
+          }
+          send_key_combo_repeat(
+            kfd,
+            KEY_RIGHTSHIFT,
+            KEY_F12,
+            mangohud_repeat,
+            mangohud_delay_ms,
+            mangohud_hold_ms
+          );
         }
-        send_key_combo_repeat(
-          kfd,
-          KEY_RIGHTSHIFT,
-          KEY_F12,
-          mangohud_repeat,
-          mangohud_delay_ms,
-          mangohud_hold_ms
-        );
         fprintf(stderr, "joypadmouse: mangohud toggle\n");
       }
     }

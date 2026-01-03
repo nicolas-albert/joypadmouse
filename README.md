@@ -18,7 +18,7 @@ To avoid conflicting with clients that already use **Start long-press** for mous
 Xbox-style layout (works well with Sunshine’s default virtual Xbox controller):
 
 - **Toggle mouse mode (default)**: hold **Back/Select + LB** for 500 ms
-- **MangoHud toggle HUD (default)**: **LB + RB + Back/Select** (sends `Shift_R+F12` on release)
+- **MangoHud toggle HUD (default)**: **LB + RB + Back/Select** (sends `Shift_R+F12` on release; keeps Shift held)
 - **Move cursor**: Left Stick
 - **Scroll**: Right Stick Y
 - **Left click**: A
