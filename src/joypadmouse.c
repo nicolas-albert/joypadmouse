@@ -151,7 +151,7 @@ static void usage(const char *argv0) {
     stderr,
     "Usage: %s [--device auto|/dev/input/jsN] [--mouse-toggle start+lb|start|start+rb|lb+rb|start+back|back|back+lb] "
     "[--mangohud-toggle lb+rb+start|lb+rb+back|start|back|start+back|none] [--mangohud-repeat 1] [--mangohud-delay-ms 80] "
-    "[--mangohud-hold-ms 0] [--mangohud-prekey shift|f12|esc|tab|space|enter|none] [--mangohud-prekey-delay-ms 80] "
+    "[--mangohud-hold-ms 0] [--mangohud-prekey shift|f12|esc|tab|space|enter|scrolllock|pause|none] [--mangohud-prekey-delay-ms 80] "
     "[--hold-ms 500] [--speed 300] [--wheel-rate 4.5] [--deadzone 8000] [--poll-hz 125] [--log-events]\n"
     "\n"
     "Mouse mode toggle (default): hold BACK+LB for hold-ms.\n"
@@ -212,7 +212,9 @@ static int create_uinput_keyboard(const char *name) {
 
   if (ioctl(fd, UI_SET_EVBIT, EV_KEY) < 0 ||
       ioctl(fd, UI_SET_KEYBIT, KEY_RIGHTSHIFT) < 0 ||
-      ioctl(fd, UI_SET_KEYBIT, KEY_F12) < 0) {
+      ioctl(fd, UI_SET_KEYBIT, KEY_F12) < 0 ||
+      ioctl(fd, UI_SET_KEYBIT, KEY_SCROLLLOCK) < 0 ||
+      ioctl(fd, UI_SET_KEYBIT, KEY_PAUSE) < 0) {
     close(fd);
     return -1;
   }
@@ -585,6 +587,10 @@ int main(int argc, char **argv) {
       mangohud_prekey_code = KEY_SPACE;
     } else if (!strcmp(mangohud_prekey, "enter")) {
       mangohud_prekey_code = KEY_ENTER;
+    } else if (!strcmp(mangohud_prekey, "scrolllock")) {
+      mangohud_prekey_code = KEY_SCROLLLOCK;
+    } else if (!strcmp(mangohud_prekey, "pause")) {
+      mangohud_prekey_code = KEY_PAUSE;
     } else {
       fprintf(stderr, "joypadmouse: invalid --mangohud-prekey value: %s\n", mangohud_prekey);
       usage(argv[0]);
