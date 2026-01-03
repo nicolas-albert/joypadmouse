@@ -7,6 +7,7 @@
 #include <linux/uinput.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,6 +41,19 @@ static void sleep_ms(int ms) {
   ts.tv_sec = ms / 1000;
   ts.tv_nsec = (long) (ms % 1000) * 1000000L;
   nanosleep(&ts, NULL);
+}
+
+static void log_event(int64_t *last_ms, const char *fmt, ...) {
+  int64_t now = now_ms();
+  int64_t delta = *last_ms ? (now - *last_ms) : 0;
+  *last_ms = now;
+
+  fprintf(stderr, "joypadmouse: +%lldms ", (long long) delta);
+  va_list args;
+  va_start(args, fmt);
+  vfprintf(stderr, fmt, args);
+  va_end(args);
+  fputc('\n', stderr);
 }
 
 static int emit_event(int fd, uint16_t type, uint16_t code, int32_t value) {
@@ -393,22 +407,6 @@ static void send_key_tap(int fd, uint16_t key) {
   emit_syn(fd);
 }
 
-static void send_key_down(int fd, uint16_t key) {
-  if (fd < 0) {
-    return;
-  }
-  emit_event(fd, EV_KEY, key, 1);
-  emit_syn(fd);
-}
-
-static void send_key_up(int fd, uint16_t key) {
-  if (fd < 0) {
-    return;
-  }
-  emit_event(fd, EV_KEY, key, 0);
-  emit_syn(fd);
-}
-
 static void send_key_combo_repeat(
   int fd,
   uint16_t modifier_key,
@@ -448,6 +446,7 @@ int main(int argc, char **argv) {
   int mangohud_hold_ms = 0;
   int mangohud_prekey_delay_ms = 200;
   bool log_events = false;
+  int64_t last_log_ms = 0;
 
   for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "--device") && i + 1 < argc) {
@@ -731,9 +730,9 @@ int main(int argc, char **argv) {
           if (log_events) {
             const char *label = button_label(e.number);
             if (label) {
-              fprintf(stderr, "joypadmouse: button=%s(%u) value=%d\n", label, e.number, e.value ? 1 : 0);
+              log_event(&last_log_ms, "button=%s(%u) value=%d", label, e.number, e.value ? 1 : 0);
             } else {
-              fprintf(stderr, "joypadmouse: button=%u value=%d\n", e.number, e.value ? 1 : 0);
+              log_event(&last_log_ms, "button=%u value=%d", e.number, e.value ? 1 : 0);
             }
           }
         }
@@ -774,67 +773,62 @@ int main(int argc, char **argv) {
     }
 
     bool mangohud_chord_active = false;
+    bool mangohud_all_released = true;
     if (mangohud_enabled) {
       mangohud_chord_active = true;
       if (mangohud_requires_start) {
         mangohud_chord_active = mangohud_chord_active &&
                                 btn_start < (int) sizeof(buttons) && buttons[btn_start];
+        mangohud_all_released = mangohud_all_released &&
+                                (btn_start >= (int) sizeof(buttons) || !buttons[btn_start]);
       }
       if (mangohud_requires_lb) {
         mangohud_chord_active = mangohud_chord_active &&
                                 btn_lb < (int) sizeof(buttons) && buttons[btn_lb];
+        mangohud_all_released = mangohud_all_released &&
+                                (btn_lb >= (int) sizeof(buttons) || !buttons[btn_lb]);
       }
       if (mangohud_requires_rb) {
         mangohud_chord_active = mangohud_chord_active &&
                                 btn_rb < (int) sizeof(buttons) && buttons[btn_rb];
+        mangohud_all_released = mangohud_all_released &&
+                                (btn_rb >= (int) sizeof(buttons) || !buttons[btn_rb]);
       }
       if (mangohud_requires_back) {
         mangohud_chord_active = mangohud_chord_active &&
                                 btn_back < (int) sizeof(buttons) && buttons[btn_back];
+        mangohud_all_released = mangohud_all_released &&
+                                (btn_back >= (int) sizeof(buttons) || !buttons[btn_back]);
       }
     }
 
     if (mangohud_enabled && kfd >= 0) {
       if (mangohud_chord_active && !mangohud_prev_active) {
         mangohud_pending = true;
-      } else if (!mangohud_chord_active && mangohud_prev_active && mangohud_pending) {
+      } else if (mangohud_pending && !mangohud_chord_active && mangohud_all_released) {
         mangohud_pending = false;
         if (mangohud_release_delay_ms > 0) {
           sleep_ms(mangohud_release_delay_ms);
         }
-        if (mangohud_prekey_code == KEY_RIGHTSHIFT) {
-          send_key_down(kfd, KEY_RIGHTSHIFT);
+        if (mangohud_prekey_code != 0) {
+          send_key_tap(kfd, mangohud_prekey_code);
           if (mangohud_prekey_delay_ms > 0) {
             sleep_ms(mangohud_prekey_delay_ms);
           }
-          for (int i = 0; i < mangohud_repeat; i++) {
-            send_key_down(kfd, KEY_F12);
-            if (mangohud_hold_ms > 0) {
-              sleep_ms(mangohud_hold_ms);
-            }
-            send_key_up(kfd, KEY_F12);
-            if (mangohud_delay_ms > 0 && i + 1 < mangohud_repeat) {
-              sleep_ms(mangohud_delay_ms);
-            }
-          }
-          send_key_up(kfd, KEY_RIGHTSHIFT);
-        } else {
-          if (mangohud_prekey_code != 0) {
-            send_key_tap(kfd, mangohud_prekey_code);
-            if (mangohud_prekey_delay_ms > 0) {
-              sleep_ms(mangohud_prekey_delay_ms);
-            }
-          }
-          send_key_combo_repeat(
-            kfd,
-            KEY_RIGHTSHIFT,
-            KEY_F12,
-            mangohud_repeat,
-            mangohud_delay_ms,
-            mangohud_hold_ms
-          );
         }
-        fprintf(stderr, "joypadmouse: mangohud toggle\n");
+        send_key_combo_repeat(
+          kfd,
+          KEY_RIGHTSHIFT,
+          KEY_F12,
+          mangohud_repeat,
+          mangohud_delay_ms,
+          mangohud_hold_ms
+        );
+        if (log_events) {
+          log_event(&last_log_ms, "mangohud toggle");
+        } else {
+          fprintf(stderr, "joypadmouse: mangohud toggle\n");
+        }
       }
     }
 
@@ -862,7 +856,11 @@ int main(int argc, char **argv) {
       } else if (!toggle_consumed && (now_ms() - toggle_down_at) >= hold_ms) {
         mouse_mode = !mouse_mode;
         toggle_consumed = true;
-        fprintf(stderr, "joypadmouse: mouse_mode=%s\n", mouse_mode ? "on" : "off");
+        if (log_events) {
+          log_event(&last_log_ms, "mouse_mode=%s", mouse_mode ? "on" : "off");
+        } else {
+          fprintf(stderr, "joypadmouse: mouse_mode=%s\n", mouse_mode ? "on" : "off");
+        }
         notify_toggle(mouse_mode, hold_ms);
 
         if (!mouse_mode) {
