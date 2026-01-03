@@ -448,6 +448,7 @@ int main(int argc, char **argv) {
   bool log_events = false;
   int64_t last_log_ms = 0;
   int64_t mangohud_ready_at = -1;
+  int64_t last_input_ms = 0;
 
   for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "--device") && i + 1 < argc) {
@@ -713,6 +714,7 @@ int main(int argc, char **argv) {
 
   const int sleep_us = 1000000 / poll_hz;
   const int mangohud_release_delay_ms = 200;
+  const int mangohud_idle_ms = 120;
 
   while (!g_stop) {
     int64_t now = now_ms();
@@ -720,6 +722,7 @@ int main(int argc, char **argv) {
     for (;;) {
       ssize_t r = read(jfd, &e, sizeof(e));
       if (r == (ssize_t) sizeof(e)) {
+        last_input_ms = now_ms();
         uint8_t type = e.type & ~JS_EVENT_INIT;
         if (type == JS_EVENT_AXIS) {
           if (e.number < (uint8_t) (sizeof(axes) / sizeof(axes[0]))) {
@@ -817,7 +820,8 @@ int main(int argc, char **argv) {
           mangohud_ready_at = now + mangohud_release_delay_ms;
         }
 
-        if (mangohud_ready_at >= 0 && now >= mangohud_ready_at) {
+        if (mangohud_ready_at >= 0 && now >= mangohud_ready_at &&
+            (last_input_ms == 0 || (now - last_input_ms) >= mangohud_idle_ms)) {
           mangohud_pending = false;
           mangohud_ready_at = -1;
           if (mangohud_prekey_code != 0) {
