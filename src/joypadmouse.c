@@ -449,6 +449,7 @@ int main(int argc, char **argv) {
   int64_t last_log_ms = 0;
   int64_t mangohud_ready_at = -1;
   int64_t last_input_ms = 0;
+  int64_t mangohud_prekey_at = -1;
 
   for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "--device") && i + 1 < argc) {
@@ -714,7 +715,6 @@ int main(int argc, char **argv) {
 
   const int sleep_us = 1000000 / poll_hz;
   const int mangohud_release_delay_ms = 200;
-  const int mangohud_idle_ms = 120;
 
   while (!g_stop) {
     int64_t now = now_ms();
@@ -811,37 +811,48 @@ int main(int argc, char **argv) {
       if (mangohud_chord_active && !mangohud_prev_active) {
         mangohud_pending = true;
         mangohud_ready_at = -1;
+        mangohud_prekey_at = -1;
       }
 
       if (mangohud_pending) {
         if (mangohud_chord_active || !mangohud_all_released) {
           mangohud_ready_at = -1;
-        } else if (mangohud_ready_at < 0) {
-          mangohud_ready_at = now + mangohud_release_delay_ms;
-        }
-
-        if (mangohud_ready_at >= 0 && now >= mangohud_ready_at &&
-            (last_input_ms == 0 || (now - last_input_ms) >= mangohud_idle_ms)) {
-          mangohud_pending = false;
-          mangohud_ready_at = -1;
-          if (mangohud_prekey_code != 0) {
-            send_key_tap(kfd, mangohud_prekey_code);
-            if (mangohud_prekey_delay_ms > 0) {
-              sleep_ms(mangohud_prekey_delay_ms);
-            }
+          mangohud_prekey_at = -1;
+        } else if (mangohud_prekey_at < 0) {
+          if (mangohud_ready_at < 0) {
+            mangohud_ready_at = now + mangohud_release_delay_ms;
           }
-          send_key_combo_repeat(
-            kfd,
-            KEY_RIGHTSHIFT,
-            KEY_F12,
-            mangohud_repeat,
-            mangohud_delay_ms,
-            mangohud_hold_ms
-          );
-          if (log_events) {
-            log_event(&last_log_ms, "mangohud toggle");
-          } else {
-            fprintf(stderr, "joypadmouse: mangohud toggle\n");
+          if (now >= mangohud_ready_at &&
+              (last_input_ms == 0 || (now - last_input_ms) >= mangohud_release_delay_ms)) {
+            if (mangohud_prekey_code != 0) {
+              send_key_tap(kfd, mangohud_prekey_code);
+              if (log_events) {
+                log_event(&last_log_ms, "mangohud prekey");
+              }
+            }
+            mangohud_prekey_at = now;
+            mangohud_ready_at = -1;
+          }
+        } else {
+          if (last_input_ms > mangohud_prekey_at) {
+            mangohud_prekey_at = -1;
+            mangohud_ready_at = -1;
+          } else if (now >= mangohud_prekey_at + mangohud_prekey_delay_ms) {
+            mangohud_pending = false;
+            mangohud_prekey_at = -1;
+            send_key_combo_repeat(
+              kfd,
+              KEY_RIGHTSHIFT,
+              KEY_F12,
+              mangohud_repeat,
+              mangohud_delay_ms,
+              mangohud_hold_ms
+            );
+            if (log_events) {
+              log_event(&last_log_ms, "mangohud toggle");
+            } else {
+              fprintf(stderr, "joypadmouse: mangohud toggle\n");
+            }
           }
         }
       }
