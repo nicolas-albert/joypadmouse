@@ -447,6 +447,7 @@ int main(int argc, char **argv) {
   int mangohud_prekey_delay_ms = 200;
   bool log_events = false;
   int64_t last_log_ms = 0;
+  int64_t mangohud_ready_at = -1;
 
   for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "--device") && i + 1 < argc) {
@@ -714,6 +715,7 @@ int main(int argc, char **argv) {
   const int mangohud_release_delay_ms = 200;
 
   while (!g_stop) {
+    int64_t now = now_ms();
     struct js_event e;
     for (;;) {
       ssize_t r = read(jfd, &e, sizeof(e));
@@ -805,29 +807,38 @@ int main(int argc, char **argv) {
     if (mangohud_enabled && kfd >= 0) {
       if (mangohud_chord_active && !mangohud_prev_active) {
         mangohud_pending = true;
-      } else if (mangohud_pending && !mangohud_chord_active && mangohud_all_released) {
-        mangohud_pending = false;
-        if (mangohud_release_delay_ms > 0) {
-          sleep_ms(mangohud_release_delay_ms);
+        mangohud_ready_at = -1;
+      }
+
+      if (mangohud_pending) {
+        if (mangohud_chord_active || !mangohud_all_released) {
+          mangohud_ready_at = -1;
+        } else if (mangohud_ready_at < 0) {
+          mangohud_ready_at = now + mangohud_release_delay_ms;
         }
-        if (mangohud_prekey_code != 0) {
-          send_key_tap(kfd, mangohud_prekey_code);
-          if (mangohud_prekey_delay_ms > 0) {
-            sleep_ms(mangohud_prekey_delay_ms);
+
+        if (mangohud_ready_at >= 0 && now >= mangohud_ready_at) {
+          mangohud_pending = false;
+          mangohud_ready_at = -1;
+          if (mangohud_prekey_code != 0) {
+            send_key_tap(kfd, mangohud_prekey_code);
+            if (mangohud_prekey_delay_ms > 0) {
+              sleep_ms(mangohud_prekey_delay_ms);
+            }
           }
-        }
-        send_key_combo_repeat(
-          kfd,
-          KEY_RIGHTSHIFT,
-          KEY_F12,
-          mangohud_repeat,
-          mangohud_delay_ms,
-          mangohud_hold_ms
-        );
-        if (log_events) {
-          log_event(&last_log_ms, "mangohud toggle");
-        } else {
-          fprintf(stderr, "joypadmouse: mangohud toggle\n");
+          send_key_combo_repeat(
+            kfd,
+            KEY_RIGHTSHIFT,
+            KEY_F12,
+            mangohud_repeat,
+            mangohud_delay_ms,
+            mangohud_hold_ms
+          );
+          if (log_events) {
+            log_event(&last_log_ms, "mangohud toggle");
+          } else {
+            fprintf(stderr, "joypadmouse: mangohud toggle\n");
+          }
         }
       }
     }
