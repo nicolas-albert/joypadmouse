@@ -151,7 +151,7 @@ static void usage(const char *argv0) {
     stderr,
     "Usage: %s [--device auto|/dev/input/jsN] [--mouse-toggle start+lb|start|start+rb|lb+rb|start+back|back|back+lb] "
     "[--mangohud-toggle lb+rb+start|lb+rb+back|start|back|start+back|none] [--mangohud-repeat 1] [--mangohud-delay-ms 80] "
-    "[--mangohud-hold-ms 0] [--mangohud-prekey shift|f12|esc|tab|space|enter|scrolllock|pause|none] [--mangohud-prekey-delay-ms 80] "
+    "[--mangohud-hold-ms 80] [--mangohud-prekey shift|f12|esc|tab|space|enter|scrolllock|pause|none] [--mangohud-prekey-delay-ms 80] "
     "[--hold-ms 500] [--speed 300] [--wheel-rate 4.5] [--deadzone 8000] [--poll-hz 125] [--log-events]\n"
     "\n"
     "Mouse mode toggle (default): hold BACK+LB for hold-ms.\n"
@@ -445,7 +445,7 @@ int main(int argc, char **argv) {
   int poll_hz = 125;
   int mangohud_repeat = 1;
   int mangohud_delay_ms = 80;
-  int mangohud_hold_ms = 0;
+  int mangohud_hold_ms = 80;
   int mangohud_prekey_delay_ms = 200;
   bool log_events = false;
   int64_t last_log_ms = 0;
