@@ -18,7 +18,7 @@ To avoid conflicting with clients that already use **Start long-press** for mous
 Xbox-style layout (works well with Sunshine’s default virtual Xbox controller):
 
 - **Toggle mouse mode (default)**: hold **Back/Select + LB** for 500 ms
-- **MangoHud toggle HUD (default)**: **LB + RB + Back/Select** (sends `Shift_R+F12` after release + short idle window)
+- **MangoHud toggle HUD (default)**: **LB + RB + Start** (sends `Shift_R+F12` on press)
 - **Move cursor**: Left Stick
 - **Scroll**: Right Stick Y
 - **Left click**: A
@@ -90,7 +90,7 @@ You can adjust parameters either by calling `joypadmouse` directly or via enviro
 - `JOYPADMOUSE_WHEEL_RATE` (default `4.5`) — scroll speed (lower is slower)
 - `JOYPADMOUSE_HOLD_MS` (default `500`) — long-press toggle time
 - `JOYPADMOUSE_MOUSE_TOGGLE` (default `back+lb`) — mouse toggle chord (`start+lb`, `start`, `start+rb`, `lb+rb`, `start+back`, `back`, `back+lb`)
-- `JOYPADMOUSE_MANGOHUD_TOGGLE` (default `lb+rb+back`) — MangoHud chord (`lb+rb+start`, `lb+rb+back`, `start`, `back`, `start+back`, `none`)
+- `JOYPADMOUSE_MANGOHUD_TOGGLE` (default `lb+rb+start`) — MangoHud chord (`lb+rb+start`, `lb+rb+back`, `start`, `back`, `start+back`, `none`)
 - `JOYPADMOUSE_MANGOHUD_REPEAT` (default `1`) — how many times to send the MangoHud hotkey
 - `JOYPADMOUSE_MANGOHUD_DELAY_MS` (default `80`) — delay between repeated MangoHud hotkeys
 - `JOYPADMOUSE_MANGOHUD_HOLD_MS` (default `0`) — hold time for the MangoHud hotkey before release
@@ -107,10 +107,10 @@ Example:
 JOYPADMOUSE_SPEED=200 JOYPADMOUSE_WHEEL_RATE=3 sunshine-joypadmouse-start
 ```
 
-If you need a Start-based MangoHud toggle, switch to **LB+RB+Start**:
+If a Moonlight client swallows **Start**, switch MangoHud to **LB+RB+Back**:
 
 ```bash
-JOYPADMOUSE_MANGOHUD_TOGGLE=lb+rb+start sunshine-joypadmouse-start
+JOYPADMOUSE_MANGOHUD_TOGGLE=lb+rb+back sunshine-joypadmouse-start
 ```
 
 If a game needs a keyboard event before it will accept the MangoHud hotkey, add a pre-key:

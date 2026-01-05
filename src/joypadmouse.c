@@ -436,7 +436,7 @@ static void send_key_combo_repeat(
 int main(int argc, char **argv) {
   const char *joy_path = "auto";
   const char *mouse_toggle = "back+lb";
-  const char *mangohud_toggle = "lb+rb+back";
+  const char *mangohud_toggle = "lb+rb+start";
   const char *mangohud_prekey = "shift";
   int hold_ms = 500;
   int deadzone = 8000;
@@ -449,9 +449,6 @@ int main(int argc, char **argv) {
   int mangohud_prekey_delay_ms = 200;
   bool log_events = false;
   int64_t last_log_ms = 0;
-  int64_t mangohud_ready_at = -1;
-  int64_t last_input_ms = 0;
-  int64_t mangohud_prekey_at = -1;
 
   for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "--device") && i + 1 < argc) {
@@ -710,7 +707,6 @@ int main(int argc, char **argv) {
   int64_t toggle_down_at = -1;
   bool toggle_consumed = false;
   bool mangohud_prev_active = false;
-  bool mangohud_pending = false;
 
   double dx_acc = 0.0;
   double dy_acc = 0.0;
@@ -720,15 +716,12 @@ int main(int argc, char **argv) {
   const double fast_mult = 2.00;
 
   const int sleep_us = 1000000 / poll_hz;
-  const int mangohud_release_delay_ms = 200;
 
   while (!g_stop) {
-    int64_t now = now_ms();
     struct js_event e;
     for (;;) {
       ssize_t r = read(jfd, &e, sizeof(e));
       if (r == (ssize_t) sizeof(e)) {
-        last_input_ms = now_ms();
         uint8_t type = e.type & ~JS_EVENT_INIT;
         if (type == JS_EVENT_AXIS) {
           if (e.number < (uint8_t) (sizeof(axes) / sizeof(axes[0]))) {
@@ -784,83 +777,45 @@ int main(int argc, char **argv) {
     }
 
     bool mangohud_chord_active = false;
-    bool mangohud_all_released = true;
     if (mangohud_enabled) {
       mangohud_chord_active = true;
       if (mangohud_requires_start) {
         mangohud_chord_active = mangohud_chord_active &&
                                 btn_start < (int) sizeof(buttons) && buttons[btn_start];
-        mangohud_all_released = mangohud_all_released &&
-                                (btn_start >= (int) sizeof(buttons) || !buttons[btn_start]);
       }
       if (mangohud_requires_lb) {
         mangohud_chord_active = mangohud_chord_active &&
                                 btn_lb < (int) sizeof(buttons) && buttons[btn_lb];
-        mangohud_all_released = mangohud_all_released &&
-                                (btn_lb >= (int) sizeof(buttons) || !buttons[btn_lb]);
       }
       if (mangohud_requires_rb) {
         mangohud_chord_active = mangohud_chord_active &&
                                 btn_rb < (int) sizeof(buttons) && buttons[btn_rb];
-        mangohud_all_released = mangohud_all_released &&
-                                (btn_rb >= (int) sizeof(buttons) || !buttons[btn_rb]);
       }
       if (mangohud_requires_back) {
         mangohud_chord_active = mangohud_chord_active &&
                                 btn_back < (int) sizeof(buttons) && buttons[btn_back];
-        mangohud_all_released = mangohud_all_released &&
-                                (btn_back >= (int) sizeof(buttons) || !buttons[btn_back]);
       }
     }
 
-    if (mangohud_enabled && kfd >= 0) {
-      if (mangohud_chord_active && !mangohud_prev_active) {
-        mangohud_pending = true;
-        mangohud_ready_at = -1;
-        mangohud_prekey_at = -1;
-      }
-
-      if (mangohud_pending) {
-        if (mangohud_chord_active || !mangohud_all_released) {
-          mangohud_ready_at = -1;
-          mangohud_prekey_at = -1;
-        } else if (mangohud_prekey_at < 0) {
-          if (mangohud_ready_at < 0) {
-            mangohud_ready_at = now + mangohud_release_delay_ms;
-          }
-          if (now >= mangohud_ready_at &&
-              (last_input_ms == 0 || (now - last_input_ms) >= mangohud_release_delay_ms)) {
-            if (mangohud_prekey_code != 0) {
-              send_key_tap(kfd, mangohud_prekey_code);
-              if (log_events) {
-                log_event(&last_log_ms, "mangohud prekey");
-              }
-            }
-            mangohud_prekey_at = now;
-            mangohud_ready_at = -1;
-          }
-        } else {
-          if (last_input_ms > mangohud_prekey_at) {
-            mangohud_prekey_at = -1;
-            mangohud_ready_at = -1;
-          } else if (now >= mangohud_prekey_at + mangohud_prekey_delay_ms) {
-            mangohud_pending = false;
-            mangohud_prekey_at = -1;
-            send_key_combo_repeat(
-              kfd,
-              KEY_RIGHTSHIFT,
-              KEY_F12,
-              mangohud_repeat,
-              mangohud_delay_ms,
-              mangohud_hold_ms
-            );
-            if (log_events) {
-              log_event(&last_log_ms, "mangohud toggle");
-            } else {
-              fprintf(stderr, "joypadmouse: mangohud toggle\n");
-            }
-          }
+    if (mangohud_enabled && kfd >= 0 && mangohud_chord_active && !mangohud_prev_active) {
+      if (mangohud_prekey_code != 0) {
+        send_key_tap(kfd, mangohud_prekey_code);
+        if (mangohud_prekey_delay_ms > 0) {
+          sleep_ms(mangohud_prekey_delay_ms);
         }
+      }
+      send_key_combo_repeat(
+        kfd,
+        KEY_RIGHTSHIFT,
+        KEY_F12,
+        mangohud_repeat,
+        mangohud_delay_ms,
+        mangohud_hold_ms
+      );
+      if (log_events) {
+        log_event(&last_log_ms, "mangohud toggle");
+      } else {
+        fprintf(stderr, "joypadmouse: mangohud toggle\n");
       }
     }
 
