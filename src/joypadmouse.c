@@ -155,7 +155,7 @@ static void usage(const char *argv0) {
     "[--hold-ms 500] [--speed 300] [--wheel-rate 4.5] [--deadzone 8000] [--poll-hz 125] [--log-events]\n"
     "\n"
     "Mouse mode toggle (default): hold BACK+LB for hold-ms.\n"
-    "MangoHud toggle HUD (configurable): LB + RB + BACK (sends Shift_R+F12).\n"
+    "MangoHud toggle HUD (configurable): LB + RB + BACK (sends Tab, then Shift_R+F12).\n"
     "Mapping (Xbox-style): LS=move, RS-Y=wheel, A=left click, B=right click, X=middle click, LB=slow, RB=fast.\n",
     argv0
   );
@@ -436,8 +436,8 @@ static void send_key_combo_repeat(
 int main(int argc, char **argv) {
   const char *joy_path = "auto";
   const char *mouse_toggle = "back+lb";
-  const char *mangohud_toggle = "lb+rb+start";
-  const char *mangohud_prekey = "shift";
+  const char *mangohud_toggle = "lb+rb+back";
+  const char *mangohud_prekey = "tab";
   int hold_ms = 500;
   int deadzone = 8000;
   int speed = 300;
