@@ -893,7 +893,23 @@ int main(int argc, char **argv) {
       if (axis_rt >= 0 && axis_rt < (int) (sizeof(axes) / sizeof(axes[0]))) {
         panic_rt_active = axes[axis_rt] > panic_rt_threshold;
       }
+      if (!panic_rt_active && (axis_rt < 0 || nintendo_layout)) {
+        int btn_limit = (int) buttons_count;
+        if (btn_limit > (int) sizeof(buttons)) {
+          btn_limit = (int) sizeof(buttons);
+        }
+        for (int i = 8; i < btn_limit; i++) {
+          if (i == btn_lb) {
+            continue;
+          }
+          if (buttons[i]) {
+            panic_rt_active = true;
+            break;
+          }
+        }
+      }
     }
+
 
     bool panic_chord_active = false;
     if (panic_enabled && panic_rt_active) {
@@ -907,8 +923,11 @@ int main(int argc, char **argv) {
                              btn_lb < (int) sizeof(buttons) && buttons[btn_lb];
       }
       if (panic_requires_rb) {
-        panic_chord_active = panic_chord_active &&
-                             btn_rb < (int) sizeof(buttons) && buttons[btn_rb];
+        bool rb_pressed = btn_rb < (int) sizeof(buttons) && buttons[btn_rb];
+        if (!rb_pressed && nintendo_layout && btn_lb < (int) sizeof(buttons)) {
+          rb_pressed = buttons[btn_lb];
+        }
+        panic_chord_active = panic_chord_active && rb_pressed;
       }
       if (panic_requires_back) {
         panic_chord_active = panic_chord_active &&
