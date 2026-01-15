@@ -19,6 +19,7 @@ Xbox-style layout (works well with Sunshine’s default virtual Xbox controller)
 
 - **Toggle mouse mode (default)**: hold **Back/Select + LB** for 500 ms
 - **MangoHud toggle HUD (default)**: **LB + RB + Back/Select** (sends `Tab`, then `Shift_R+F12` on press)
+- **Panic kill (default)**: **Start + Back/Select + LB + RB** (runs `joypadmouse-kill-top`)
 - **Move cursor**: Left Stick
 - **Scroll**: Right Stick Y
 - **Left click**: A
@@ -91,6 +92,8 @@ You can adjust parameters either by calling `joypadmouse` directly or via enviro
 - `JOYPADMOUSE_HOLD_MS` (default `500`) — long-press toggle time
 - `JOYPADMOUSE_MOUSE_TOGGLE` (default `back+lb`) — mouse toggle chord (`start+lb`, `start`, `start+rb`, `lb+rb`, `start+back`, `back`, `back+lb`)
 - `JOYPADMOUSE_MANGOHUD_TOGGLE` (default `lb+rb+back`) — MangoHud chord (`lb+rb+start`, `lb+rb+back`, `start`, `back`, `start+back`, `none`)
+- `JOYPADMOUSE_PANIC_CMD` (default `joypadmouse-kill-top`) — command to run on panic chord (`none` disables)
+- `JOYPADMOUSE_PANIC_CHORD` (default `start+back+lb+rb`) — panic chord (requires all four buttons)
 - `JOYPADMOUSE_LOG_EVENTS` (default `0`) — set to `1` to log button events to the logfile
 - `JOYPADMOUSE_DEVICE` (default `auto`) — force a joystick device (e.g. `/dev/input/js2`)
 

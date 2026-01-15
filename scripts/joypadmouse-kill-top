@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+user_name="${JOYPADMOUSE_PANIC_USER:-$USER}"
+exclude_re="${JOYPADMOUSE_PANIC_EXCLUDE_RE:-^(sunshine|joypadmouse|Xorg|Xwayland|kwin|gnome-shell|pipewire|wireplumber|pulseaudio|systemd|dbus-daemon)$}"
+
+pid=$(ps -u "${user_name}" -o pid=,comm=,pcpu= --sort=-pcpu \
+  | awk -v re="${exclude_re}" 'BEGIN{IGNORECASE=1} $2 !~ re {print $1; exit}')
+
+if [[ -z "${pid}" ]]; then
+  exit 0
+fi
+
+kill -TERM "${pid}" 2>/dev/null || true
+sleep 0.4
+kill -KILL "${pid}" 2>/dev/null || true

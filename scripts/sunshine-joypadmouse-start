@@ -16,17 +16,24 @@ LOGFILE="${RUNDIR}/joypadmouse.log"
 DEVICE="${JOYPADMOUSE_DEVICE:-${SUNSHINE_JOYMOUSE_DEVICE:-auto}}"
 MOUSE_TOGGLE="${JOYPADMOUSE_MOUSE_TOGGLE:-back+lb}"
 MANGOHUD_TOGGLE="${JOYPADMOUSE_MANGOHUD_TOGGLE:-${SUNSHINE_JOYMOUSE_MANGOHUD_TOGGLE:-lb+rb+back}}"
+PANIC_CMD="${JOYPADMOUSE_PANIC_CMD:-}"
+PANIC_CHORD="${JOYPADMOUSE_PANIC_CHORD:-start+back+lb+rb}"
 HOLD_MS="${JOYPADMOUSE_HOLD_MS:-${SUNSHINE_JOYMOUSE_HOLD_MS:-500}}"
 SPEED="${JOYPADMOUSE_SPEED:-${SUNSHINE_JOYMOUSE_SPEED:-300}}"
 WHEEL_RATE="${JOYPADMOUSE_WHEEL_RATE:-${SUNSHINE_JOYMOUSE_WHEEL_RATE:-4.5}}"
 LOG_EVENTS="${JOYPADMOUSE_LOG_EVENTS:-${SUNSHINE_JOYMOUSE_LOG_EVENTS:-0}}"
 
 LOG_EVENTS_FLAG=""
+PANIC_ARGS=()
 case "${LOG_EVENTS}" in
   1|true|TRUE|yes|YES|on|ON)
     LOG_EVENTS_FLAG="--log-events"
     ;;
 esac
+
+if [[ -n "${PANIC_CMD}" ]]; then
+  PANIC_ARGS+=(--panic-cmd "${PANIC_CMD}" --panic-chord "${PANIC_CHORD}")
+fi
 
 if [[ -f "${PIDFILE}" ]]; then
   pid="$(cat "${PIDFILE}" 2>/dev/null || true)"
@@ -42,6 +49,7 @@ nohup joypadmouse \
   --hold-ms "${HOLD_MS}" \
   --speed "${SPEED}" \
   --wheel-rate "${WHEEL_RATE}" \
+  "${PANIC_ARGS[@]}" \
   ${LOG_EVENTS_FLAG} \
   >>"${LOGFILE}" 2>&1 &
 

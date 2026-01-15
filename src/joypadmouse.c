@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/ioctl.h>
 #include <time.h>
 #include <unistd.h>
@@ -152,10 +153,11 @@ static void usage(const char *argv0) {
     "Usage: %s [--device auto|/dev/input/jsN] [--mouse-toggle start+lb|start|start+rb|lb+rb|start+back|back|back+lb] "
     "[--mangohud-toggle lb+rb+start|lb+rb+back|start|back|start+back|none] [--mangohud-repeat 1] [--mangohud-delay-ms 80] "
     "[--mangohud-hold-ms 80] [--mangohud-prekey shift|f12|esc|tab|space|enter|scrolllock|pause|none] [--mangohud-prekey-delay-ms 80] "
-    "[--hold-ms 500] [--speed 300] [--wheel-rate 4.5] [--deadzone 8000] [--poll-hz 125] [--log-events]\n"
+    "[--panic-chord start+back+lb+rb|none] [--panic-cmd command|none] [--hold-ms 500] [--speed 300] [--wheel-rate 4.5] [--deadzone 8000] [--poll-hz 125] [--log-events]\n"
     "\n"
     "Mouse mode toggle (default): hold BACK+LB for hold-ms.\n"
     "MangoHud toggle HUD (configurable): LB + RB + BACK (sends Tab, then Shift_R+F12).\n"
+    "Panic kill (default): START + BACK + LB + RB (runs joypadmouse-kill-top).\n"
     "Mapping (Xbox-style): LS=move, RS-Y=wheel, A=left click, B=right click, X=middle click, LB=slow, RB=fast.\n",
     argv0
   );
@@ -380,6 +382,20 @@ static void notify_toggle(bool mouse_mode, int hold_ms) {
   _exit(0);
 }
 
+static void run_panic_cmd(const char *cmd) {
+  if (!cmd || !*cmd || !strcmp(cmd, "none")) {
+    return;
+  }
+
+  pid_t pid = fork();
+  if (pid != 0) {
+    return;
+  }
+
+  execl("/bin/sh", "sh", "-c", cmd, (char *) NULL);
+  _exit(0);
+}
+
 static void send_key_combo_hold(int fd, uint16_t modifier_key, uint16_t key, int hold_ms) {
   if (fd < 0) {
     return;
@@ -438,6 +454,8 @@ int main(int argc, char **argv) {
   const char *mouse_toggle = "back+lb";
   const char *mangohud_toggle = "lb+rb+back";
   const char *mangohud_prekey = "tab";
+  const char *panic_chord = "start+back+lb+rb";
+  const char *panic_cmd = "joypadmouse-kill-top";
   int hold_ms = 500;
   int deadzone = 8000;
   int speed = 300;
@@ -595,6 +613,30 @@ int main(int argc, char **argv) {
     }
   }
 
+
+  bool panic_enabled = true;
+  bool panic_requires_start = false;
+  bool panic_requires_lb = false;
+  bool panic_requires_rb = false;
+  bool panic_requires_back = false;
+
+  if (!panic_cmd || !*panic_cmd || !strcmp(panic_cmd, "none") || !strcmp(panic_chord, "none")) {
+    panic_enabled = false;
+  } else if (!parse_chord(panic_chord, &panic_requires_start, &panic_requires_back,
+                          &panic_requires_lb, &panic_requires_rb)) {
+    fprintf(stderr, "joypadmouse: invalid --panic-chord value: %s\n", panic_chord);
+    usage(argv[0]);
+    return 2;
+  } else {
+    bool panic_valid = panic_requires_start && panic_requires_back &&
+                       panic_requires_lb && panic_requires_rb;
+    if (!panic_valid) {
+      fprintf(stderr, "joypadmouse: invalid --panic-chord value: %s\n", panic_chord);
+      usage(argv[0]);
+      return 2;
+    }
+  }
+
   if (hold_ms < 0) {
     hold_ms = 0;
   }
@@ -698,15 +740,24 @@ int main(int argc, char **argv) {
   const int btn_a = 0;
   const int btn_b = 1;
   const int btn_x = 2;
-  const int btn_lb = 4;
+  int btn_lb = 4;
   const int btn_rb = 5;
   const int btn_back = 6;
   const int btn_start = 7;
+
+  bool nintendo_layout = false;
+  if (name[0] && (strcasestr(name, "nintendo") || strcasestr(name, "switch"))) {
+    nintendo_layout = true;
+    if (buttons_count > 9) {
+      btn_lb = 9;
+    }
+  }
 
   bool mouse_mode = false;
   int64_t toggle_down_at = -1;
   bool toggle_consumed = false;
   bool mangohud_prev_active = false;
+  bool panic_prev_active = false;
 
   double dx_acc = 0.0;
   double dy_acc = 0.0;
@@ -732,7 +783,12 @@ int main(int argc, char **argv) {
             buttons[e.number] = e.value ? 1 : 0;
           }
           if (log_events) {
-            const char *label = button_label(e.number);
+            const char *label = NULL;
+            if (nintendo_layout && e.number == (uint8_t) btn_lb) {
+              label = "LB";
+            } else {
+              label = button_label(e.number);
+            }
             if (label) {
               log_event(&last_log_ms, "button=%s(%u) value=%d", label, e.number, e.value ? 1 : 0);
             } else {
@@ -776,8 +832,38 @@ int main(int argc, char **argv) {
       break;
     }
 
+    bool panic_chord_active = false;
+    if (panic_enabled) {
+      panic_chord_active = true;
+      if (panic_requires_start) {
+        panic_chord_active = panic_chord_active &&
+                             btn_start < (int) sizeof(buttons) && buttons[btn_start];
+      }
+      if (panic_requires_lb) {
+        panic_chord_active = panic_chord_active &&
+                             btn_lb < (int) sizeof(buttons) && buttons[btn_lb];
+      }
+      if (panic_requires_rb) {
+        panic_chord_active = panic_chord_active &&
+                             btn_rb < (int) sizeof(buttons) && buttons[btn_rb];
+      }
+      if (panic_requires_back) {
+        panic_chord_active = panic_chord_active &&
+                             btn_back < (int) sizeof(buttons) && buttons[btn_back];
+      }
+    }
+
+    if (panic_enabled && panic_chord_active && !panic_prev_active) {
+      run_panic_cmd(panic_cmd);
+      if (log_events) {
+        log_event(&last_log_ms, "panic kill");
+      } else {
+        fprintf(stderr, "joypadmouse: panic kill\n");
+      }
+    }
+
     bool mangohud_chord_active = false;
-    if (mangohud_enabled) {
+    if (!panic_chord_active && mangohud_enabled) {
       mangohud_chord_active = true;
       if (mangohud_requires_start) {
         mangohud_chord_active = mangohud_chord_active &&
@@ -797,7 +883,7 @@ int main(int argc, char **argv) {
       }
     }
 
-    if (mangohud_enabled && kfd >= 0 && mangohud_chord_active && !mangohud_prev_active) {
+    if (!panic_chord_active && mangohud_enabled && kfd >= 0 && mangohud_chord_active && !mangohud_prev_active) {
       if (mangohud_prekey_code != 0) {
         send_key_tap(kfd, mangohud_prekey_code);
         if (mangohud_prekey_delay_ms > 0) {
@@ -833,7 +919,7 @@ int main(int argc, char **argv) {
       toggle_chord_active = toggle_chord_active && btn_back < (int) sizeof(buttons) && buttons[btn_back];
     }
 
-    if (mangohud_chord_active) {
+    if (panic_chord_active || mangohud_chord_active) {
       toggle_down_at = -1;
       toggle_consumed = false;
     } else if (toggle_chord_active) {
@@ -919,6 +1005,7 @@ int main(int argc, char **argv) {
     }
 
     mangohud_prev_active = mangohud_chord_active;
+    panic_prev_active = panic_chord_active;
     memcpy(prev_buttons, buttons, sizeof(prev_buttons));
 
     if (sleep_us > 0) {
