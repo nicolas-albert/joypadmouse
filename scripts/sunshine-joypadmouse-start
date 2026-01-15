@@ -17,7 +17,8 @@ DEVICE="${JOYPADMOUSE_DEVICE:-${SUNSHINE_JOYMOUSE_DEVICE:-auto}}"
 MOUSE_TOGGLE="${JOYPADMOUSE_MOUSE_TOGGLE:-back+lb}"
 MANGOHUD_TOGGLE="${JOYPADMOUSE_MANGOHUD_TOGGLE:-${SUNSHINE_JOYMOUSE_MANGOHUD_TOGGLE:-lb+rb+back}}"
 PANIC_CMD="${JOYPADMOUSE_PANIC_CMD:-}"
-PANIC_CHORD="${JOYPADMOUSE_PANIC_CHORD:-start+back+lb+rb}"
+PANIC_CHORD="${JOYPADMOUSE_PANIC_CHORD:-}"
+PANIC_HOLD_MS="${JOYPADMOUSE_PANIC_HOLD_MS:-}"
 HOLD_MS="${JOYPADMOUSE_HOLD_MS:-${SUNSHINE_JOYMOUSE_HOLD_MS:-500}}"
 SPEED="${JOYPADMOUSE_SPEED:-${SUNSHINE_JOYMOUSE_SPEED:-300}}"
 WHEEL_RATE="${JOYPADMOUSE_WHEEL_RATE:-${SUNSHINE_JOYMOUSE_WHEEL_RATE:-4.5}}"
@@ -31,8 +32,16 @@ case "${LOG_EVENTS}" in
     ;;
 esac
 
-if [[ -n "${PANIC_CMD}" ]]; then
-  PANIC_ARGS+=(--panic-cmd "${PANIC_CMD}" --panic-chord "${PANIC_CHORD}")
+if [[ -n "${PANIC_CMD}" || -n "${PANIC_CHORD}" || -n "${PANIC_HOLD_MS}" ]]; then
+  if [[ -n "${PANIC_CMD}" ]]; then
+    PANIC_ARGS+=(--panic-cmd "${PANIC_CMD}")
+  fi
+  if [[ -n "${PANIC_CHORD}" ]]; then
+    PANIC_ARGS+=(--panic-chord "${PANIC_CHORD}")
+  fi
+  if [[ -n "${PANIC_HOLD_MS}" ]]; then
+    PANIC_ARGS+=(--panic-hold-ms "${PANIC_HOLD_MS}")
+  fi
 fi
 
 if [[ -f "${PIDFILE}" ]]; then

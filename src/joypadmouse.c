@@ -147,17 +147,58 @@ static bool parse_chord(
   return *req_start || *req_back || *req_lb || *req_rb;
 }
 
+static bool parse_panic_chord(const char *chord, bool *req_start, bool *req_back, bool *req_lb, bool *req_rb, bool *req_rt) {
+  if (!chord || !*chord) {
+    return false;
+  }
+
+  char buf[64];
+  if (strlen(chord) >= sizeof(buf)) {
+    return false;
+  }
+
+  snprintf(buf, sizeof(buf), "%s", chord);
+
+  *req_start = false;
+  *req_back = false;
+  *req_lb = false;
+  *req_rb = false;
+  *req_rt = false;
+
+  char *saveptr = NULL;
+  for (char *tok = strtok_r(buf, "+", &saveptr); tok; tok = strtok_r(NULL, "+", &saveptr)) {
+    if (!*tok) {
+      return false;
+    }
+    if (!strcmp(tok, "start")) {
+      *req_start = true;
+    } else if (!strcmp(tok, "back") || !strcmp(tok, "select")) {
+      *req_back = true;
+    } else if (!strcmp(tok, "lb")) {
+      *req_lb = true;
+    } else if (!strcmp(tok, "rb")) {
+      *req_rb = true;
+    } else if (!strcmp(tok, "rt")) {
+      *req_rt = true;
+    } else {
+      return false;
+    }
+  }
+
+  return *req_start || *req_back || *req_lb || *req_rb || *req_rt;
+}
+
 static void usage(const char *argv0) {
   fprintf(
     stderr,
     "Usage: %s [--device auto|/dev/input/jsN] [--mouse-toggle start+lb|start|start+rb|lb+rb|start+back|back|back+lb] "
     "[--mangohud-toggle lb+rb+start|lb+rb+back|start|back|start+back|none] [--mangohud-repeat 1] [--mangohud-delay-ms 80] "
     "[--mangohud-hold-ms 80] [--mangohud-prekey shift|f12|esc|tab|space|enter|scrolllock|pause|none] [--mangohud-prekey-delay-ms 80] "
-    "[--panic-chord start+back+lb+rb|none] [--panic-cmd command|none] [--hold-ms 500] [--speed 300] [--wheel-rate 4.5] [--deadzone 8000] [--poll-hz 125] [--log-events]\n"
+    "[--panic-chord back+rb+rt|none] [--panic-cmd command|none] [--panic-hold-ms 3000] [--hold-ms 500] [--speed 300] [--wheel-rate 4.5] [--deadzone 8000] [--poll-hz 125] [--log-events]\n"
     "\n"
     "Mouse mode toggle (default): hold BACK+LB for hold-ms.\n"
     "MangoHud toggle HUD (configurable): LB + RB + BACK (sends Tab, then Shift_R+F12).\n"
-    "Panic kill (default): START + BACK + LB + RB (runs joypadmouse-kill-top).\n"
+    "Panic kill (default): BACK + RB + RT (hold 3s, runs joypadmouse-kill-top).\n"
     "Mapping (Xbox-style): LS=move, RS-Y=wheel, A=left click, B=right click, X=middle click, LB=slow, RB=fast.\n",
     argv0
   );
@@ -454,8 +495,10 @@ int main(int argc, char **argv) {
   const char *mouse_toggle = "back+lb";
   const char *mangohud_toggle = "lb+rb+back";
   const char *mangohud_prekey = "tab";
-  const char *panic_chord = "start+back+lb+rb";
+  const char *panic_chord = "back+rb+rt";
   const char *panic_cmd = "joypadmouse-kill-top";
+  int panic_hold_ms = 3000;
+  int panic_rt_threshold = 20000;
   int hold_ms = 500;
   int deadzone = 8000;
   int speed = 300;
@@ -485,6 +528,12 @@ int main(int argc, char **argv) {
       mangohud_prekey = argv[++i];
     } else if (!strcmp(argv[i], "--mangohud-prekey-delay-ms") && i + 1 < argc) {
       mangohud_prekey_delay_ms = atoi(argv[++i]);
+    } else if (!strcmp(argv[i], "--panic-chord") && i + 1 < argc) {
+      panic_chord = argv[++i];
+    } else if (!strcmp(argv[i], "--panic-cmd") && i + 1 < argc) {
+      panic_cmd = argv[++i];
+    } else if (!strcmp(argv[i], "--panic-hold-ms") && i + 1 < argc) {
+      panic_hold_ms = atoi(argv[++i]);
     } else if (!strcmp(argv[i], "--hold-ms") && i + 1 < argc) {
       hold_ms = atoi(argv[++i]);
     } else if (!strcmp(argv[i], "--deadzone") && i + 1 < argc) {
@@ -619,22 +668,22 @@ int main(int argc, char **argv) {
   bool panic_requires_lb = false;
   bool panic_requires_rb = false;
   bool panic_requires_back = false;
+  bool panic_requires_rt = false;
 
   if (!panic_cmd || !*panic_cmd || !strcmp(panic_cmd, "none") || !strcmp(panic_chord, "none")) {
     panic_enabled = false;
-  } else if (!parse_chord(panic_chord, &panic_requires_start, &panic_requires_back,
-                          &panic_requires_lb, &panic_requires_rb)) {
+  } else if (!parse_panic_chord(panic_chord, &panic_requires_start, &panic_requires_back,
+                               &panic_requires_lb, &panic_requires_rb, &panic_requires_rt)) {
     fprintf(stderr, "joypadmouse: invalid --panic-chord value: %s\n", panic_chord);
     usage(argv[0]);
     return 2;
-  } else {
-    bool panic_valid = panic_requires_start && panic_requires_back &&
-                       panic_requires_lb && panic_requires_rb;
-    if (!panic_valid) {
-      fprintf(stderr, "joypadmouse: invalid --panic-chord value: %s\n", panic_chord);
-      usage(argv[0]);
-      return 2;
-    }
+  }
+
+  if (panic_hold_ms < 0) {
+    panic_hold_ms = 0;
+  }
+  if (panic_hold_ms > 10000) {
+    panic_hold_ms = 10000;
   }
 
   if (hold_ms < 0) {
@@ -737,6 +786,11 @@ int main(int argc, char **argv) {
   const int axis_ly = 1;
   const int axis_ry = 4;
 
+  int axis_rt = -1;
+  if (axes_count >= 6) {
+    axis_rt = 5;
+  }
+
   const int btn_a = 0;
   const int btn_b = 1;
   const int btn_x = 2;
@@ -757,7 +811,8 @@ int main(int argc, char **argv) {
   int64_t toggle_down_at = -1;
   bool toggle_consumed = false;
   bool mangohud_prev_active = false;
-  bool panic_prev_active = false;
+  int64_t panic_down_at = -1;
+  bool panic_consumed = false;
 
   double dx_acc = 0.0;
   double dy_acc = 0.0;
@@ -832,8 +887,16 @@ int main(int argc, char **argv) {
       break;
     }
 
+    bool panic_rt_active = true;
+    if (panic_requires_rt) {
+      panic_rt_active = false;
+      if (axis_rt >= 0 && axis_rt < (int) (sizeof(axes) / sizeof(axes[0]))) {
+        panic_rt_active = axes[axis_rt] > panic_rt_threshold;
+      }
+    }
+
     bool panic_chord_active = false;
-    if (panic_enabled) {
+    if (panic_enabled && panic_rt_active) {
       panic_chord_active = true;
       if (panic_requires_start) {
         panic_chord_active = panic_chord_active &&
@@ -853,13 +916,22 @@ int main(int argc, char **argv) {
       }
     }
 
-    if (panic_enabled && panic_chord_active && !panic_prev_active) {
-      run_panic_cmd(panic_cmd);
-      if (log_events) {
-        log_event(&last_log_ms, "panic kill");
-      } else {
-        fprintf(stderr, "joypadmouse: panic kill\n");
+    if (panic_enabled && panic_chord_active) {
+      if (panic_down_at < 0) {
+        panic_down_at = now_ms();
+        panic_consumed = false;
+      } else if (!panic_consumed && (now_ms() - panic_down_at) >= panic_hold_ms) {
+        run_panic_cmd(panic_cmd);
+        panic_consumed = true;
+        if (log_events) {
+          log_event(&last_log_ms, "panic kill");
+        } else {
+          fprintf(stderr, "joypadmouse: panic kill\n");
+        }
       }
+    } else {
+      panic_down_at = -1;
+      panic_consumed = false;
     }
 
     bool mangohud_chord_active = false;
@@ -1005,7 +1077,6 @@ int main(int argc, char **argv) {
     }
 
     mangohud_prev_active = mangohud_chord_active;
-    panic_prev_active = panic_chord_active;
     memcpy(prev_buttons, buttons, sizeof(prev_buttons));
 
     if (sleep_us > 0) {
